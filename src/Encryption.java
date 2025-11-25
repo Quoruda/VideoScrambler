@@ -116,33 +116,6 @@ public class Encryption {
         return output;
     }
 
-    /**
-     * Mélange un bloc de lignes selon la formule : ((r + (2s+1)*idLigne) % size).
-     *
-     * @param input Image source
-     * @param output Image destination
-     * @param startLine Indice de la première ligne du bloc
-     * @param size Taille du bloc (puissance de 2)
-     * @param r Décalage (offset)
-     * @param s Pas (step)
-     */
-    private static void scrambleBlock(Mat input, Mat output, int startLine, int size, int r, int s) {
-        for (int idLigne = 0; idLigne < size; idLigne++) {
-            // Calculer la position de destination selon la formule
-            int destPos = (r + (2 * s + 1) * idLigne) % size;
-
-            // Copier la ligne source vers la position de destination
-            int sourceLine = startLine + idLigne;
-            int destLine = startLine + destPos;
-
-            // Copier la ligne
-            Mat rowSrc = input.row(sourceLine);
-            Mat rowDst = output.row(destLine);
-            rowSrc.copyTo(rowDst);
-            rowSrc.release();
-            rowDst.release();
-        }
-    }
 
     /**
      * Version optimisée de scrambleBlock avec step précalculé.
@@ -165,33 +138,6 @@ public class Encryption {
         }
     }
 
-    /**
-     * Démélange un bloc de lignes (inverse du scramble).
-     *
-     * @param input Image source (chiffrée)
-     * @param output Image destination (déchiffrée)
-     * @param startLine Indice de la première ligne du bloc
-     * @param size Taille du bloc (puissance de 2)
-     * @param r Décalage (offset)
-     * @param s Pas (step)
-     */
-    private static void unscrambleBlock(Mat input, Mat output, int startLine, int size, int r, int s) {
-        for (int idLigne = 0; idLigne < size; idLigne++) {
-            // Calculer la position source selon la formule
-            int sourcePos = (r + (2 * s + 1) * idLigne) % size;
-
-            // Copier la ligne source vers la position originale
-            int sourceLine = startLine + sourcePos;
-            int destLine = startLine + idLigne;
-
-            // Copier la ligne
-            Mat rowSrc = input.row(sourceLine);
-            Mat rowDst = output.row(destLine);
-            rowSrc.copyTo(rowDst);
-            rowSrc.release();
-            rowDst.release();
-        }
-    }
 
     /**
      * Version optimisée de unscrambleBlock avec step précalculé.
@@ -319,6 +265,31 @@ public class Encryption {
         keys = new ArrayList<Key>(keysQualityHashmap.keySet());
         keys.sort(Comparator.comparingDouble(keysQualityHashmap::get));
         Collections.reverse(keys);
+
+        return keys.getFirst();
+    }
+
+    public static Key findKeyForEncryption(Mat frame) {
+        HashMap<Key, Double> keysQualityHashmap = new HashMap<>();
+
+
+        for (int s = 0; s < 128; s+=1) {
+            for (int r = 1; r < 256; r+=64) {
+                findKeyProcessForDecryption(keysQualityHashmap, new Key(r, s), frame);
+            }
+        }
+        // s_median
+        ArrayList<Key> keys = new ArrayList<Key>(keysQualityHashmap.keySet());
+        keys.sort(Comparator.comparingDouble(keysQualityHashmap::get));
+
+        int s = keys.getFirst().getS();
+
+        keysQualityHashmap.clear();
+        for(int r = 0; r < 256; r+=1) {
+            findKeyProcessForDecryption(keysQualityHashmap, new Key(r, s), frame);
+        }
+        keys = new ArrayList<Key>(keysQualityHashmap.keySet());
+        keys.sort(Comparator.comparingDouble(keysQualityHashmap::get));
 
         return keys.getFirst();
     }

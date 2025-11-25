@@ -101,11 +101,9 @@ public class VideoPlayer extends Application {
         if (isEncryptMode) {
             inputLabel.setText("Vidéo d'entrée (claire)");
             outputLabel.setText("Vidéo de sortie (chiffrée)");
-            autoButton.setVisible(false);
         } else {
             inputLabel.setText("Vidéo d'entrée (chiffrée)");
             outputLabel.setText("Vidéo de sortie (déchiffrée)");
-            autoButton.setVisible(true);
         }
 
         // Rafraîchir l'affichage si une vidéo est chargée
@@ -115,7 +113,7 @@ public class VideoPlayer extends Application {
     }
 
     @FXML
-    private void handleAutoDecrypt() {
+    private void handleAutoKey() {
         if (videoCapture == null || !videoCapture.isOpened()) {
             Alert alert = new Alert(Alert.AlertType.WARNING);
             alert.setTitle("Aucune vidéo");
@@ -131,7 +129,8 @@ public class VideoPlayer extends Application {
 
         // Lancer la recherche dans un thread séparé pour ne pas bloquer l'interface
         new Thread(() -> {
-            System.out.println("Recherche automatique de clé...");
+            String modeText = isEncryptMode ? "chiffrement optimal" : "déchiffrement";
+            System.out.println("Recherche automatique de clé pour " + modeText + "...");
 
             // Prendre une frame aléatoire
             java.util.Random rand = new java.util.Random();
@@ -146,9 +145,15 @@ public class VideoPlayer extends Application {
                 return;
             }
 
-            Key key = Encryption.findKeyForDecryption(frame);
-
-            System.out.println("Clé trouvée: r=" + key.getR() + ", s=" + key.getS());
+            // Choisir la fonction selon le mode
+            Key key;
+            if (isEncryptMode) {
+                key = Encryption.findKeyForEncryption(frame);
+                System.out.println("Clé de chiffrement optimal trouvée: r=" + key.getR() + ", s=" + key.getS());
+            } else {
+                key = Encryption.findKeyForDecryption(frame);
+                System.out.println("Clé de déchiffrement trouvée: r=" + key.getR() + ", s=" + key.getS());
+            }
 
             // Mettre à jour l'interface dans le thread JavaFX
             javafx.application.Platform.runLater(() -> {
@@ -162,7 +167,13 @@ public class VideoPlayer extends Application {
                 Alert alert = new Alert(Alert.AlertType.INFORMATION);
                 alert.setTitle("Recherche terminée");
                 alert.setHeaderText("Clé trouvée !");
-                alert.setContentText("r = " + key.getR() + "\ns = " + key.getS());
+                String contentText = "r = " + key.getR() + "\ns = " + key.getS();
+                if (isEncryptMode) {
+                    contentText += "\n\n(Clé optimale pour maximiser le brouillage)";
+                } else {
+                    contentText += "\n\n(Clé optimale pour restaurer l'image)";
+                }
+                alert.setContentText(contentText);
                 alert.showAndWait();
 
                 // Réactiver les contrôles

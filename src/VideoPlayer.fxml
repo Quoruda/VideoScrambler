@@ -29,7 +29,7 @@
                 <TextField fx:id="rField" text="3" prefWidth="80" />
                 <Label text="s (0-127):" />
                 <TextField fx:id="sField" text="7" prefWidth="80" />
-                <Button fx:id="autoButton" text="🔍 Automatique" visible="false" onAction="#handleAutoDecrypt" />
+                <Button fx:id="autoButton" text="🔍 Automatique" onAction="#handleAutoKey" />
             </HBox>
 
             <!-- Contrôles de lecture -->
