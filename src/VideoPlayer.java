@@ -146,7 +146,7 @@ public class VideoPlayer extends Application {
                 return;
             }
 
-            Key key = Encryption.findKey(frame);
+            Key key = Encryption.findKeyForDecryption(frame);
 
             System.out.println("Clé trouvée: r=" + key.getR() + ", s=" + key.getS());
 

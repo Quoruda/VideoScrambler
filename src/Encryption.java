@@ -274,7 +274,7 @@ public class Encryption {
         return count > 0 ? sum / count : 0.0;
     }
 
-    private static void findKeyProcess(HashMap<Key, Double> map, Key key, Mat frame) {
+    private static void findKeyProcessForDecryption(HashMap<Key, Double> map, Key key, Mat frame) {
         Mat decrypted_frame = null;
         Mat bw_frame = null;
         decrypted_frame = decrypt(frame, key.getR(), key.getS());
@@ -296,13 +296,13 @@ public class Encryption {
      * @param frame Image chiffrée (Mat)
      * @return Clé optimale (Key)
      */
-    public static Key findKey(Mat frame) {
+    public static Key findKeyForDecryption(Mat frame) {
         HashMap<Key, Double> keysQualityHashmap = new HashMap<>();
 
 
         for (int s = 0; s < 128; s+=1) {
             for (int r = 1; r < 256; r+=64) {
-                findKeyProcess(keysQualityHashmap, new Key(r, s), frame);
+                findKeyProcessForDecryption(keysQualityHashmap, new Key(r, s), frame);
             }
         }
         // s_median
@@ -314,7 +314,7 @@ public class Encryption {
 
         keysQualityHashmap.clear();
         for(int r = 0; r < 256; r+=1) {
-            findKeyProcess(keysQualityHashmap, new Key(r, s), frame);
+            findKeyProcessForDecryption(keysQualityHashmap, new Key(r, s), frame);
         }
         keys = new ArrayList<Key>(keysQualityHashmap.keySet());
         keys.sort(Comparator.comparingDouble(keysQualityHashmap::get));
