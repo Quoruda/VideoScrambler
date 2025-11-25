@@ -239,9 +239,9 @@ public class VideoPlayer extends Application {
         // Choisir le fichier de destination
         FileChooser fileChooser = new FileChooser();
         fileChooser.setTitle("Enregistrer la vidéo");
-        fileChooser.setInitialFileName(isEncryptMode ? "video_chiffree.mp4" : "video_dechiffree.mp4");
+        fileChooser.setInitialFileName(isEncryptMode ? "video_chiffree.mkv" : "video_dechiffree.mkv");
         fileChooser.getExtensionFilters().add(
-            new FileChooser.ExtensionFilter("Fichiers MP4", "*.mp4")
+            new FileChooser.ExtensionFilter("Fichiers MKV", "*.mkv")
         );
         File file = fileChooser.showSaveDialog(stage);
 
@@ -353,22 +353,28 @@ public class VideoPlayer extends Application {
         // Créer le VideoWriter avec différents codecs selon la plateforme
         VideoWriter videoWriter = null;
 
-        // Essayer plusieurs codecs pour maximiser la compatibilité
+        // IMPORTANT : Utiliser uniquement des codecs SANS PERTE (lossless)
+        // Les codecs avec compression (H264, XVID, etc.) détériorent les pixels
+        // et empêchent un déchiffrement correct
         int[] codecs = {
-            VideoWriter.fourcc('m', 'p', '4', 'v'),  // MPEG-4
-            VideoWriter.fourcc('M', 'P', '4', 'V'),  // MPEG-4 (majuscules)
-            VideoWriter.fourcc('X', 'V', 'I', 'D'),  // Xvid
-            VideoWriter.fourcc('H', '2', '6', '4'),  // H264
-            VideoWriter.fourcc('a', 'v', 'c', '1')   // H264
+            VideoWriter.fourcc('F', 'F', 'V', '1'),  // FFV1 (lossless, meilleur pour MKV)
+            VideoWriter.fourcc('H', 'F', 'Y', 'U'),  // HuffYUV (lossless)
+            VideoWriter.fourcc('L', 'A', 'G', 'S'),  // Lagarith (lossless)
+            0,                                        // Codec par défaut (souvent sans compression)
+            VideoWriter.fourcc('M', 'J', 'P', 'G'),  // Motion JPEG (quasi-lossless avec qualité max)
+            VideoWriter.fourcc('D', 'I', 'B', ' ')   // Raw RGB (lossless mais volumineux)
         };
 
+        String[] codecNames = {"FFV1", "HuffYUV", "Lagarith", "Default", "MJPEG", "DIB"};
+        int codecIndex = 0;
         for (int fourcc : codecs) {
             videoWriter = new VideoWriter(outputPath, fourcc, exportFps, new Size(frameWidth, frameHeight));
             if (videoWriter.isOpened()) {
-                System.out.println("VideoWriter ouvert avec codec: " + fourcc);
+                System.out.println("✓ VideoWriter ouvert avec codec LOSSLESS: " + codecNames[codecIndex] + " (fourcc=" + fourcc + ")");
                 break;
             }
             videoWriter.release();
+            codecIndex++;
         }
 
         if (videoWriter == null || !videoWriter.isOpened()) {
