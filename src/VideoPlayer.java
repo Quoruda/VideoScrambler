@@ -356,21 +356,25 @@ public class VideoPlayer extends Application {
         // IMPORTANT : Utiliser uniquement des codecs SANS PERTE (lossless)
         // Les codecs avec compression (H264, XVID, etc.) détériorent les pixels
         // et empêchent un déchiffrement correct
+        //
+        // FFV1 est le meilleur choix : lossless + compression efficace
+        // Il peut réduire la taille de 50-70% par rapport aux codecs raw
         int[] codecs = {
-            VideoWriter.fourcc('F', 'F', 'V', '1'),  // FFV1 (lossless, meilleur pour MKV)
-            VideoWriter.fourcc('H', 'F', 'Y', 'U'),  // HuffYUV (lossless)
-            VideoWriter.fourcc('L', 'A', 'G', 'S'),  // Lagarith (lossless)
-            0,                                        // Codec par défaut (souvent sans compression)
-            VideoWriter.fourcc('M', 'J', 'P', 'G'),  // Motion JPEG (quasi-lossless avec qualité max)
-            VideoWriter.fourcc('D', 'I', 'B', ' ')   // Raw RGB (lossless mais volumineux)
+            VideoWriter.fourcc('F', 'F', 'V', '1'),  // FFV1 (lossless + compression, OPTIMAL)
+            VideoWriter.fourcc('H', 'F', 'Y', 'U'),  // HuffYUV (lossless, moins compressé)
+            VideoWriter.fourcc('M', 'J', 'P', 'G'),  // Motion JPEG (quasi-lossless)
+            VideoWriter.fourcc('L', 'A', 'G', 'S'),  // Lagarith (lossless, rarement disponible)
+            0,                                        // Codec par défaut
+            VideoWriter.fourcc('D', 'I', 'B', ' ')   // Raw RGB (dernier recours, très lourd)
         };
 
-        String[] codecNames = {"FFV1", "HuffYUV", "Lagarith", "Default", "MJPEG", "DIB"};
+        String[] codecNames = {"FFV1", "HuffYUV", "MJPEG", "Lagarith", "Default", "DIB"};
         int codecIndex = 0;
         for (int fourcc : codecs) {
-            videoWriter = new VideoWriter(outputPath, fourcc, exportFps, new Size(frameWidth, frameHeight));
+            videoWriter = new VideoWriter(outputPath, fourcc, exportFps, new Size(frameWidth, frameHeight), true);
             if (videoWriter.isOpened()) {
                 System.out.println("✓ VideoWriter ouvert avec codec LOSSLESS: " + codecNames[codecIndex] + " (fourcc=" + fourcc + ")");
+                System.out.println("  Note: FFV1 offre le meilleur ratio qualité/taille (lossless avec compression)");
                 break;
             }
             videoWriter.release();
