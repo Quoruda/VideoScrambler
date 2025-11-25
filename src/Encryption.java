@@ -247,26 +247,19 @@ public class Encryption {
 
 
         for (int s = 0; s < 128; s+=1) {
-            for (int r = 1; r < 256; r+=64) {
-                findKeyProcessForDecryption(keysQualityHashmap, new Key(r, s), frame);
-            }
+            findKeyProcessForDecryption(keysQualityHashmap, new Key(0, s), frame);
         }
-        // s_median
-        ArrayList<Key> keys = new ArrayList<Key>(keysQualityHashmap.keySet());
-        keys.sort(Comparator.comparingDouble(keysQualityHashmap::get));
-        Collections.reverse(keys);
 
-        int s = keys.getFirst().getS();
+        Key bestSKey = Collections.max(keysQualityHashmap.entrySet(), Comparator.comparingDouble(HashMap.Entry::getValue)).getKey();
+        int s = bestSKey.getS();
 
         keysQualityHashmap.clear();
         for(int r = 0; r < 256; r+=1) {
             findKeyProcessForDecryption(keysQualityHashmap, new Key(r, s), frame);
         }
-        keys = new ArrayList<Key>(keysQualityHashmap.keySet());
-        keys.sort(Comparator.comparingDouble(keysQualityHashmap::get));
-        Collections.reverse(keys);
+        Key bestRKey = Collections.max(keysQualityHashmap.entrySet(), Comparator.comparingDouble(HashMap.Entry::getValue)).getKey();
 
-        return keys.getFirst();
+        return bestRKey;
     }
 
     public static Key findKeyForEncryption(Mat frame) {
