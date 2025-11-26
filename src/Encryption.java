@@ -17,38 +17,51 @@ public class Encryption {
      * @return Image chiffrée (Mat)
      */
     public static Mat encrypt(Mat input, int r, int s) {
-        if (input == null || input.empty()) {
-            return input;
-        }
-
-        // Optimisation : si r=0 et s=0, pas de mélange nécessaire
-        if (r == 0 && s == 0) {
-            return input.clone();
-        }
+        if (input == null || input.empty()) return input;
+        if (r == 0 && s == 0) return input.clone();
 
         int height = input.rows();
         int width = input.cols();
+        int channels = input.channels();
 
-        // Créer une image de sortie
-        Mat output = new Mat(height, width, input.type());
+        // 1. Extraction brute des données (Très rapide)
+        int rowSize = width * channels; // Taille d'une ligne en octets
+        int totalSize = height * rowSize;
+        byte[] sourceData = new byte[totalSize];
+        byte[] destData = new byte[totalSize];
 
-        // Précalculer (2*s+1) pour éviter de le recalculer à chaque fois
+        input.get(0, 0, sourceData); // Un seul appel JNI pour tout lire
+
         int step = 2 * s + 1;
-
-        // Traiter par itérations (blocs de puissances de 2)
         int startLine = 0;
 
+        // 2. Traitement Pure Java (Aucun appel OpenCV dans la boucle)
         while (startLine < height) {
-            // Calculer la taille du bloc : plus grande puissance de 2 <= lignes restantes
             int remainingLines = height - startLine;
             int blockSize = largestPowerOf2(remainingLines);
 
-            // Mélanger les lignes dans ce bloc
-            scrambleBlockOptimized(input, output, startLine, blockSize, r, step);
+            // Optimisation mathématique : modulo avec puissance de 2
+            // x % blockSize est équivalent à x & (blockSize - 1)
+            int blockMask = blockSize - 1;
 
-            // Passer au bloc suivant
+            for (int i = 0; i < blockSize; i++) {
+                // Calcul de la destination
+                int destIndexInBlock = (r + step * i) & blockMask;
+
+                int sourceRow = startLine + i;
+                int destRow = startLine + destIndexInBlock;
+
+                // Copie rapide de mémoire (bloc de bytes)
+                System.arraycopy(sourceData, sourceRow * rowSize,
+                        destData, destRow * rowSize,
+                        rowSize);
+            }
             startLine += blockSize;
         }
+
+        // 3. Reconstruction de l'image (Un seul appel JNI)
+        Mat output = new Mat(height, width, input.type());
+        output.put(0, 0, destData);
 
         return output;
     }
@@ -80,38 +93,44 @@ public class Encryption {
      * @return Image déchiffrée (Mat)
      */
     public static Mat decrypt(Mat input, int r, int s) {
-        if (input == null || input.empty()) {
-            return input;
-        }
-
-        // Optimisation : si r=0 et s=0, pas de démélange nécessaire
-        if (r == 0 && s == 0) {
-            return input.clone();
-        }
+        if (input == null || input.empty()) return input;
+        if (r == 0 && s == 0) return input.clone();
 
         int height = input.rows();
         int width = input.cols();
+        int channels = input.channels();
 
-        // Créer une image de sortie
-        Mat output = new Mat(height, width, input.type());
+        int rowSize = width * channels;
+        int totalSize = height * rowSize;
+        byte[] sourceData = new byte[totalSize];
+        byte[] destData = new byte[totalSize];
 
-        // Précalculer (2*s+1) pour éviter de le recalculer à chaque fois
+        input.get(0, 0, sourceData);
+
         int step = 2 * s + 1;
-
-        // Traiter par itérations (blocs de puissances de 2)
         int startLine = 0;
 
         while (startLine < height) {
-            // Calculer la taille du bloc : plus grande puissance de 2 <= lignes restantes
             int remainingLines = height - startLine;
             int blockSize = largestPowerOf2(remainingLines);
+            int blockMask = blockSize - 1;
 
-            // Démélanger les lignes dans ce bloc (inversion)
-            unscrambleBlockOptimized(input, output, startLine, blockSize, r, step);
+            for (int i = 0; i < blockSize; i++) {
+                // Calcul inverse : on trouve où était la ligne source
+                int sourceIndexInBlock = (r + step * i) & blockMask;
 
-            // Passer au bloc suivant
+                int sourceRow = startLine + sourceIndexInBlock; // Ligne chiffrée
+                int destRow = startLine + i;                    // Ligne originale
+
+                System.arraycopy(sourceData, sourceRow * rowSize,
+                        destData, destRow * rowSize,
+                        rowSize);
+            }
             startLine += blockSize;
         }
+
+        Mat output = new Mat(height, width, input.type());
+        output.put(0, 0, destData);
 
         return output;
     }
