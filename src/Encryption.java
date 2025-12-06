@@ -306,4 +306,101 @@ public class Encryption {
         return keys.getFirst();
     }
 
+    public static int findSmartS(Mat input) {
+        if (input == null || input.empty()) return 0;
+
+        int height = input.rows();
+        int width = input.cols();
+
+        int blockSize = largestPowerOf2(height);
+        int blockMask = blockSize - 1;
+
+        int midCol = width / 2;
+        byte[] columnData = new byte[blockSize];
+
+        for (int i = 0; i < blockSize; i++) {
+            double[] pixel = input.get(i, midCol);
+            columnData[i] = (byte) pixel[0];
+        }
+
+        double minDifference = Double.MAX_VALUE;
+        int bestS = 0;
+
+        for (int s = 0; s < 128; s++) {
+            int step = 2 * s + 1;
+            long currentDiff = 0;
+
+            for (int i = 0; i < blockSize; i++) {
+                int nextIndex = (i + step) & blockMask;
+
+                int val1 = columnData[i] & 0xFF;
+                int val2 = columnData[nextIndex] & 0xFF;
+
+                currentDiff += Math.abs(val1 - val2);
+            }
+
+            if (currentDiff < minDifference) {
+                minDifference = currentDiff;
+                bestS = s;
+            }
+        }
+
+        return bestS;
+    }
+
+    public static int findSmartR(Mat input, int s) {
+        if (input == null || input.empty()) return 0;
+
+        int height = input.rows();
+        int width = input.cols();
+
+        int size1 = largestPowerOf2(height);
+
+        if (size1 == height) return 0;
+
+        int size2 = largestPowerOf2(height - size1);
+
+        int step = 2 * s + 1;
+
+        int mask1 = size1 - 1;
+        int mask2 = size2 - 1;
+
+        int colStep = Math.max(1, width / 20);
+
+        double minDiff = Double.MAX_VALUE;
+        int bestR = 0;
+
+        for (int r = 0; r < 256; r++) {
+            long currentDiff = 0;
+
+            int srcRowInBlock1 = (r + step * (size1 - 1)) & mask1;
+            int absoluteSrcRow1 = srcRowInBlock1;
+
+            int srcRowInBlock2 = (r + step * 0) & mask2;
+            int absoluteSrcRow2 = size1 + srcRowInBlock2;
+
+            for (int col = 0; col < width; col += colStep) {
+                double[] p1 = input.get(absoluteSrcRow1, col);
+                double[] p2 = input.get(absoluteSrcRow2, col);
+
+                double val1 = p1[0];
+                double val2 = p2[0];
+
+                currentDiff += Math.abs(val1 - val2);
+            }
+
+            if (currentDiff < minDiff) {
+                minDiff = currentDiff;
+                bestR = r;
+            }
+        }
+
+        return bestR;
+    }
+
+    public static Key findSmartKey(Mat input) {
+        int s = findSmartS(input);
+        int r = findSmartR(input, s);
+        return new Key(r, s);
+    }
 }

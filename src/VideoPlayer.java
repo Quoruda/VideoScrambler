@@ -16,6 +16,7 @@ import org.opencv.videoio.VideoCapture;
 import org.opencv.videoio.VideoWriter;
 import org.opencv.videoio.Videoio;
 
+import java.io.Console;
 import java.io.File;
 
 public class VideoPlayer extends Application {
@@ -151,7 +152,7 @@ public class VideoPlayer extends Application {
                 key = Encryption.findKeyForEncryption(frame);
                 System.out.println("Clé de chiffrement optimal trouvée: r=" + key.getR() + ", s=" + key.getS());
             } else {
-                key = Encryption.findKeyForDecryption(frame);
+                key = Encryption.findSmartKey(frame);
                 System.out.println("Clé de déchiffrement trouvée: r=" + key.getR() + ", s=" + key.getS());
             }
 
@@ -179,6 +180,7 @@ public class VideoPlayer extends Application {
                 // Réactiver les contrôles
                 autoButton.setDisable(false);
                 playButton.setDisable(false);
+
             });
         }).start();
     }
