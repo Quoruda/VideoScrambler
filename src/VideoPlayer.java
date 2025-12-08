@@ -89,6 +89,9 @@ public class VideoPlayer extends Application {
         VideoPlayer controller = loader.getController();
         controller.stage = primaryStage;
 
+        // Ajouter les listeners sur les champs r et s
+        controller.setupKeyChangeListeners();
+
         Scene scene = new Scene(root, 1000, 550);
         primaryStage.setTitle("Chiffrement/Déchiffrement de Vidéo");
         primaryStage.setScene(scene);
@@ -107,9 +110,36 @@ public class VideoPlayer extends Application {
             outputLabel.setText("Vidéo de sortie (déchiffrée)");
         }
 
-        // Rafraîchir l'affichage si une vidéo est chargée
         if (videoCapture != null && videoCapture.isOpened()) {
             showFrame(currentFrameIndex);
+        }
+    }
+
+    /**
+     * Configure les listeners sur les champs r et s pour détecter les changements
+     */
+    private void setupKeyChangeListeners() {
+        rField.textProperty().addListener((observable, oldValue, newValue) -> handleKeyChange("r", newValue));
+        sField.textProperty().addListener((observable, oldValue, newValue) -> handleKeyChange("s", newValue));
+    }
+
+    /**
+     * Fonction appelée à chaque changement de r ou s
+     * Affiche les nouvelles valeurs dans la console
+     */
+    private void handleKeyChange(String paramName, String newValue) {
+        try {
+            int r = Integer.parseInt(rField.getText());
+            int s = Integer.parseInt(sField.getText());
+
+            if (r < 0 || r > 255) return;
+            if (s < 0 || s > 127) return;
+
+            if (videoCapture != null && videoCapture.isOpened()) {
+                showFrame(currentFrameIndex);
+            }
+        } catch (NumberFormatException e) {
+            // Ignore les valeurs non numériques pendant la saisie
         }
     }
 
@@ -195,10 +225,7 @@ public class VideoPlayer extends Application {
         File file = fileChooser.showOpenDialog(stage);
         if (file != null) {
             openVideo(file.getAbsolutePath());
-            playButton.setDisable(false);
-            prevButton.setDisable(false);
-            nextButton.setDisable(false);
-            exportButton.setDisable(false);
+            setAppBusy(false);
         }
     }
 
@@ -227,227 +254,175 @@ public class VideoPlayer extends Application {
         }
     }
 
-    @FXML
-    private void handleExportVideo() {
-        if (videoCapture == null || !videoCapture.isOpened()) {
-            Alert alert = new Alert(Alert.AlertType.WARNING);
-            alert.setTitle("Aucune vidéo");
-            alert.setHeaderText(null);
-            alert.setContentText("Veuillez d'abord ouvrir une vidéo.");
-            alert.showAndWait();
-            return;
-        }
+    // Gère l'activation/désactivation massive des boutons
+    private void setAppBusy(boolean disabled) {
+        exportButton.setDisable(disabled);
+        playButton.setDisable(disabled);
+        prevButton.setDisable(disabled);
+        nextButton.setDisable(disabled);
+        openButton.setDisable(disabled);
+        autoButton.setDisable(disabled);
+    }
 
-        // Choisir le fichier de destination
+    // Gère la boîte de dialogue de sauvegarde
+    private File promptForSaveFile() {
         FileChooser fileChooser = new FileChooser();
         fileChooser.setTitle("Enregistrer la vidéo");
         fileChooser.setInitialFileName(isEncryptMode ? "video_chiffree.mkv" : "video_dechiffree.mkv");
         fileChooser.getExtensionFilters().add(
-            new FileChooser.ExtensionFilter("Fichiers MKV", "*.mkv")
+                new FileChooser.ExtensionFilter("Fichiers MKV", "*.mkv")
         );
-        File file = fileChooser.showSaveDialog(stage);
+        return fileChooser.showSaveDialog(stage);
+    }
 
-        if (file == null) {
-            return; // L'utilisateur a annulé
-        }
-
-        // Désactiver les contrôles pendant l'export
-        exportButton.setDisable(true);
-        playButton.setDisable(true);
-        prevButton.setDisable(true);
-        nextButton.setDisable(true);
-        openButton.setDisable(true);
-
-        // Créer une barre de progression
-        ProgressBar progressBar = new ProgressBar(0);
+    // Crée la fenêtre de progression
+    private Alert createProgressAlert(ProgressBar progressBar, Label progressLabel, boolean[] cancelled) {
         progressBar.setPrefWidth(400);
-        Label progressLabel = new Label("Préparation de l'export...");
-
         VBox progressBox = new VBox(10, progressLabel, progressBar);
         progressBox.setPadding(new javafx.geometry.Insets(20));
 
-        Alert progressAlert = new Alert(Alert.AlertType.INFORMATION);
-        progressAlert.setTitle("Export en cours");
-        progressAlert.setHeaderText("Traitement de la vidéo");
-        progressAlert.getDialogPane().setContent(progressBox);
-        progressAlert.getButtonTypes().setAll(ButtonType.CANCEL);
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle("Export en cours");
+        alert.setHeaderText("Traitement de la vidéo");
+        alert.getDialogPane().setContent(progressBox);
+        alert.getButtonTypes().setAll(ButtonType.CANCEL);
 
-        // Variable pour suivre l'annulation
+        alert.setOnCloseRequest(event -> cancelled[0] = true);
+        return alert;
+    }
+
+    // Gère l'affichage du résultat final (Succès ou Annulation)
+    private void handleExportCompletion(boolean success, File file, boolean wasCancelled) {
+        if (success) {
+            showAlert(Alert.AlertType.INFORMATION, "Export terminé",
+                    "La vidéo a été exportée avec succès vers :\n" + file.getAbsolutePath());
+        } else if (wasCancelled) {
+            showAlert(Alert.AlertType.WARNING, "Export annulé", "L'export de la vidéo a été annulé.");
+        } else {
+            showAlert(Alert.AlertType.ERROR, "Echec", "L'export a échoué pour une raison inconnue.");
+        }
+    }
+
+    @FXML
+    private void handleExportVideo() {
+        // 1. Validation
+        if (videoCapture == null || !videoCapture.isOpened()) {
+            showAlert(Alert.AlertType.WARNING, "Aucune vidéo", "Veuillez d'abord ouvrir une vidéo.");
+            return;
+        }
+
+        // 2. Sélection du fichier
+        File file = promptForSaveFile();
+        if (file == null) return;
+
+        // 3. Préparation de l'interface (UI)
+        setAppBusy(true); // Désactive les boutons
+
+        // Création de la modale de progression
+        ProgressBar progressBar = new ProgressBar(0);
+        Label progressLabel = new Label("Préparation de l'export...");
+        // Variable pour l'annulation (tableau pour être final/mutable dans la lambda)
         final boolean[] cancelled = {false};
 
-        // Gérer l'annulation
-        progressAlert.setOnCloseRequest(event -> {
-            cancelled[0] = true;
-        });
-
+        Alert progressAlert = createProgressAlert(progressBar, progressLabel, cancelled);
         progressAlert.show();
 
-        // Lancer l'export dans un thread séparé
+        // 4. Lancement du processus en arrière-plan
         new Thread(() -> {
             try {
+                // Exécution lourde
                 boolean success = exportVideoProcess(file.getAbsolutePath(), progressBar, progressLabel, cancelled);
 
-                // Afficher un message de succès ou d'annulation
+                // Mise à jour de l'UI une fois fini
                 javafx.application.Platform.runLater(() -> {
                     progressAlert.hide();
-
-                    if (success) {
-                        Alert successAlert = new Alert(Alert.AlertType.INFORMATION);
-                        successAlert.setTitle("Export terminé");
-                        successAlert.setHeaderText("Succès !");
-                        successAlert.setContentText("La vidéo a été exportée avec succès vers :\n" + file.getAbsolutePath());
-                        successAlert.showAndWait();
-                    } else {
-                        Alert cancelAlert = new Alert(Alert.AlertType.WARNING);
-                        cancelAlert.setTitle("Export annulé");
-                        cancelAlert.setHeaderText("Export annulé");
-                        cancelAlert.setContentText("L'export de la vidéo a été annulé.");
-                        cancelAlert.showAndWait();
-                    }
-
-                    // Réactiver les contrôles
-                    exportButton.setDisable(false);
-                    playButton.setDisable(false);
-                    prevButton.setDisable(false);
-                    nextButton.setDisable(false);
-                    openButton.setDisable(false);
+                    handleExportCompletion(success, file, cancelled[0]);
+                    setAppBusy(false); // Réactive les boutons
                 });
+
             } catch (Exception e) {
                 e.printStackTrace();
                 javafx.application.Platform.runLater(() -> {
-                    progressAlert.close();
-
-                    Alert errorAlert = new Alert(Alert.AlertType.ERROR);
-                    errorAlert.setTitle("Erreur d'export");
-                    errorAlert.setHeaderText("Échec de l'export");
-                    errorAlert.setContentText("Une erreur s'est produite : " + e.getMessage());
-                    errorAlert.showAndWait();
-
-                    // Réactiver les contrôles
-                    exportButton.setDisable(false);
-                    playButton.setDisable(false);
-                    prevButton.setDisable(false);
-                    nextButton.setDisable(false);
-                    openButton.setDisable(false);
+                    progressAlert.hide();
+                    showAlert(Alert.AlertType.ERROR, "Erreur d'export", "Une erreur s'est produite : " + e.getMessage());
+                    setAppBusy(false); // Réactive les boutons
                 });
             }
         }).start();
     }
 
+    // Utilitaire générique pour afficher une alerte simple
+    private void showAlert(Alert.AlertType type, String title, String content) {
+        Alert alert = new Alert(type);
+        alert.setTitle(title);
+        alert.setHeaderText(title);
+        alert.setContentText(content);
+        alert.showAndWait();
+    }
+
     private boolean exportVideoProcess(String outputPath, ProgressBar progressBar, Label progressLabel, boolean[] cancelled) {
-        // Créer une nouvelle VideoCapture dédiée à l'export pour éviter les conflits d'accès
+        // 1. Initialisation de la lecture
         VideoCapture exportCapture = new VideoCapture(currentVideoPath);
-
         if (!exportCapture.isOpened()) {
-            throw new RuntimeException("Impossible d'ouvrir la vidéo source pour l'export");
+            throw new RuntimeException("Impossible d'ouvrir la vidéo source.");
         }
 
-        System.out.println("VideoCapture d'export créée pour: " + currentVideoPath);
+        int width = (int) exportCapture.get(Videoio.CAP_PROP_FRAME_WIDTH);
+        int height = (int) exportCapture.get(Videoio.CAP_PROP_FRAME_HEIGHT);
+        double fps = exportCapture.get(Videoio.CAP_PROP_FPS);
+        if (fps <= 0) fps = 30.0;
 
-        // Obtenir les paramètres de la vidéo source
-        int frameWidth = (int) exportCapture.get(Videoio.CAP_PROP_FRAME_WIDTH);
-        int frameHeight = (int) exportCapture.get(Videoio.CAP_PROP_FRAME_HEIGHT);
-        double exportFps = exportCapture.get(Videoio.CAP_PROP_FPS);
-        if (exportFps <= 0) exportFps = 30.0;
+        // 2. Initialisation de l'écriture (Codec unique : HuffYUV)
+        // 'H', 'F', 'Y', 'U' est rapide et sans perte (Lossless)
+        int fourcc = VideoWriter.fourcc('H', 'F', 'Y', 'U');
+        VideoWriter videoWriter = new VideoWriter(outputPath, fourcc, fps, new Size(width, height), true);
 
-        System.out.println("Démarrage export - Taille: " + frameWidth + "x" + frameHeight + ", FPS: " + exportFps);
-
-        // Créer le VideoWriter avec différents codecs selon la plateforme
-        VideoWriter videoWriter = null;
-
-        // IMPORTANT : Utiliser uniquement des codecs SANS PERTE (lossless)
-        // Les codecs avec compression (H264, XVID, etc.) détériorent les pixels
-        // et empêchent un déchiffrement correct
-        //
-        // FFV1 est le meilleur choix : lossless + compression efficace
-        // Il peut réduire la taille de 50-70% par rapport aux codecs raw
-        int[] codecs = {
-            VideoWriter.fourcc('F', 'F', 'V', '1'),  // FFV1 (lossless + compression, OPTIMAL)
-            VideoWriter.fourcc('H', 'F', 'Y', 'U'),  // HuffYUV (lossless, moins compressé)
-            VideoWriter.fourcc('M', 'J', 'P', 'G'),  // Motion JPEG (quasi-lossless)
-            VideoWriter.fourcc('L', 'A', 'G', 'S'),  // Lagarith (lossless, rarement disponible)
-            0,                                        // Codec par défaut
-            VideoWriter.fourcc('D', 'I', 'B', ' ')   // Raw RGB (dernier recours, très lourd)
-        };
-
-        String[] codecNames = {"FFV1", "HuffYUV", "MJPEG", "Lagarith", "Default", "DIB"};
-        int codecIndex = 0;
-        for (int fourcc : codecs) {
-            videoWriter = new VideoWriter(outputPath, fourcc, exportFps, new Size(frameWidth, frameHeight), true);
-            if (videoWriter.isOpened()) {
-                System.out.println("✓ VideoWriter ouvert avec codec LOSSLESS: " + codecNames[codecIndex] + " (fourcc=" + fourcc + ")");
-                System.out.println("  Note: FFV1 offre le meilleur ratio qualité/taille (lossless avec compression)");
-                break;
-            }
-            videoWriter.release();
-            codecIndex++;
+        if (!videoWriter.isOpened()) {
+            exportCapture.release();
+            throw new RuntimeException("Erreur : Impossible d'initialiser l'encodage vidéo (Codec HFYU non supporté).");
         }
 
-        if (videoWriter == null || !videoWriter.isOpened()) {
-            if (exportCapture != videoCapture) {
-                exportCapture.release();
-            }
-            throw new RuntimeException("Impossible de créer le fichier vidéo de sortie avec les codecs disponibles");
-        }
-
-        // Utiliser totalFrames (déjà calculé à l'ouverture)
-        final int actualTotalFrames = totalFrames > 0 ? totalFrames : 1000;
-
-        // Traiter chaque frame
+        // 3. Boucle de traitement
         Mat frame = new Mat();
         int processedFrames = 0;
+        final int actualTotalFrames = totalFrames > 0 ? totalFrames : 1000;
 
-        System.out.println("Début du traitement des frames... (Total attendu: " + actualTotalFrames + ")");
+        // Optimisation : Mise à jour de l'interface toutes les 1% seulement
+        int updateFrequency = Math.max(10, actualTotalFrames / 100);
 
-        while (!cancelled[0]) {
-            boolean frameRead = exportCapture.read(frame);
+        try {
+            while (!cancelled[0]) {
+                if (!exportCapture.read(frame) || frame.empty()) break;
 
-            if (!frameRead || frame.empty()) {
-                System.out.println("Fin de la lecture à la frame " + processedFrames + " (frameRead=" + frameRead + ", empty=" + frame.empty() + ")");
-                break;
-            }
+                // Traitement (Chiffrer/Déchiffrer)
+                Mat processedFrame = processFrame(frame);
 
-            // Traiter la frame (chiffrement ou déchiffrement)
-            Mat processedFrame = processFrame(frame);
+                // Écriture
+                if (processedFrame != null && !processedFrame.empty()) {
+                    videoWriter.write(processedFrame);
+                }
 
-            // Vérifier que la frame traitée n'est pas vide
-            if (processedFrame == null || processedFrame.empty()) {
-                System.err.println("ERREUR: Frame traitée vide à l'index " + processedFrames);
-                continue;
-            }
+                processedFrames++;
+                final int current = processedFrames;
 
-            // Écrire la frame traitée
-            videoWriter.write(processedFrame);
-
-            processedFrames++;
-            final int current = processedFrames;
-
-            // Mettre à jour la barre de progression tous les 10 frames pour réduire la charge
-            if (current % 10 == 0 || current == 1) {
-                javafx.application.Platform.runLater(() -> {
+                // Mise à jour de la barre de progression (Optimisée)
+                if (current % updateFrequency == 0 || current == actualTotalFrames) {
                     double progress = (double) current / actualTotalFrames;
-                    progressBar.setProgress(Math.min(progress, 1.0));
-                    progressLabel.setText(String.format("Traitement : %d / %d frames (%.1f%%)",
-                        current, actualTotalFrames, Math.min(progress * 100, 100.0)));
-                });
+                    javafx.application.Platform.runLater(() -> {
+                        progressBar.setProgress(progress);
+                        progressLabel.setText(String.format("Export : %d / %d", current, actualTotalFrames));
+                    });
+                }
             }
-        }
-
-        System.out.println("Traitement terminé, fermeture du VideoWriter...");
-
-        // Libérer les ressources
-        videoWriter.release();
-
-        // Libérer la VideoCapture d'export si c'est une instance séparée
-        if (exportCapture != videoCapture) {
+        } finally {
+            // 4. Nettoyage propre
+            videoWriter.release();
             exportCapture.release();
+            frame.release();
         }
-
-        System.out.println("Export terminé : " + processedFrames + " frames traitées sur " + actualTotalFrames + " attendues");
 
         return !cancelled[0] && processedFrames > 0;
     }
-
 
     private void openVideo(String videoPath) {
         if (videoCapture != null) {
@@ -523,10 +498,6 @@ public class VideoPlayer extends Application {
         return null;
     }
 
-    /**
-     * Méthode pour traiter la frame avec OpenCV.
-     * Applique le chiffrement ou déchiffrement selon le mode sélectionné.
-     */
     private Mat processFrame(Mat frame) {
         try {
             int r = Integer.parseInt(rField.getText());

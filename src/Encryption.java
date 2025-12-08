@@ -136,49 +136,6 @@ public class Encryption {
     }
 
 
-    /**
-     * Version optimisée de scrambleBlock avec step précalculé.
-     */
-    private static void scrambleBlockOptimized(Mat input, Mat output, int startLine, int size, int r, int step) {
-        for (int idLigne = 0; idLigne < size; idLigne++) {
-            // Calculer la position de destination selon la formule
-            int destPos = (r + step * idLigne) % size;
-
-            // Copier la ligne source vers la position de destination
-            int sourceLine = startLine + idLigne;
-            int destLine = startLine + destPos;
-
-            // Copier la ligne et libérer les vues
-            Mat rowSrc = input.row(sourceLine);
-            Mat rowDst = output.row(destLine);
-            rowSrc.copyTo(rowDst);
-            rowSrc.release();
-            rowDst.release();
-        }
-    }
-
-
-    /**
-     * Version optimisée de unscrambleBlock avec step précalculé.
-     */
-    private static void unscrambleBlockOptimized(Mat input, Mat output, int startLine, int size, int r, int step) {
-        for (int idLigne = 0; idLigne < size; idLigne++) {
-            // Calculer la position source selon la formule
-            int sourcePos = (r + step * idLigne) % size;
-
-            // Copier la ligne source vers la position originale
-            int sourceLine = startLine + sourcePos;
-            int destLine = startLine + idLigne;
-
-            // Copier la ligne et libérer les vues
-            Mat rowSrc = input.row(sourceLine);
-            Mat rowDst = output.row(destLine);
-            rowSrc.copyTo(rowDst);
-            rowSrc.release();
-            rowDst.release();
-        }
-    }
-
     private static double pearson(byte[] x, byte[] y) {
         int n = x.length;
 
