@@ -96,6 +96,28 @@ public class VideoPlayer extends Application {
     @FXML
     private Button exportButton3;
 
+    // Onglet 4: Déchiffrement avec clé dynamique (k)
+    @FXML
+    private TextField kField4;
+
+    @FXML
+    private CheckBox autoCheckBox4;
+
+    @FXML
+    private Button openButton4;
+
+    @FXML
+    private Button playButton4;
+
+    @FXML
+    private Button prevButton4;
+
+    @FXML
+    private Button nextButton4;
+
+    @FXML
+    private Button exportButton4;
+
     @FXML
     private Label inputLabel;
 
@@ -123,7 +145,8 @@ public class VideoPlayer extends Application {
     // Variable pour tracker le mode actif selon l'onglet
     private static final int TAB_ENCRYPT = 0;
     private static final int TAB_DECRYPT = 1;
-    private static final int TAB_ENCRYPT_DYNAMIC_KEY = 2;
+    private static final int TAB_DYNAMIC_KEY = 2;
+    private static final int TAB_DYNAMIC_DECRYPT = 3;
 
     @Override
     public void start(Stage primaryStage) throws Exception {
@@ -159,9 +182,12 @@ public class VideoPlayer extends Application {
         } else if (activeTab == TAB_DECRYPT) {
             inputLabel.setText("Vidéo d'entrée (chiffrée)");
             outputLabel.setText("Vidéo de sortie (déchiffrée)");
-        } else {
+        } else if (activeTab == TAB_DYNAMIC_KEY) {
             inputLabel.setText("Vidéo d'entrée (claire)");
             outputLabel.setText("Vidéo de sortie (chiffrée - clé dynamique)");
+        } else {
+            inputLabel.setText("Vidéo d'entrée (chiffrée)");
+            outputLabel.setText("Vidéo de sortie (déchiffrée - clé dynamique)");
         }
 
         if (videoCapture != null && videoCapture.isOpened()) {
@@ -174,49 +200,66 @@ public class VideoPlayer extends Application {
      */
     private void setupKeyChangeListeners() {
         // Listeners pour onglet 1 (r, s)
-        rField.textProperty().addListener((observable, oldValue, newValue) -> {
+        rField.textProperty().addListener((obs, old, neu) -> {
             if (getActiveTab() == TAB_ENCRYPT && videoCapture != null && videoCapture.isOpened()) {
                 showFrame(currentFrameIndex);
             }
         });
-        sField.textProperty().addListener((observable, oldValue, newValue) -> {
+        sField.textProperty().addListener((obs, old, neu) -> {
             if (getActiveTab() == TAB_ENCRYPT && videoCapture != null && videoCapture.isOpened()) {
                 showFrame(currentFrameIndex);
             }
         });
 
         // Listeners pour onglet 2 (r, s)
-        rField2.textProperty().addListener((observable, oldValue, newValue) -> {
+        rField2.textProperty().addListener((obs, old, neu) -> {
             if (getActiveTab() == TAB_DECRYPT && videoCapture != null && videoCapture.isOpened()) {
                 showFrame(currentFrameIndex);
             }
         });
-        sField2.textProperty().addListener((observable, oldValue, newValue) -> {
+        sField2.textProperty().addListener((obs, old, neu) -> {
             if (getActiveTab() == TAB_DECRYPT && videoCapture != null && videoCapture.isOpened()) {
                 showFrame(currentFrameIndex);
             }
         });
 
         // Listener pour onglet 3 (k)
-        kField.textProperty().addListener((observable, oldValue, newValue) -> {
-            if (getActiveTab() == TAB_ENCRYPT_DYNAMIC_KEY && videoCapture != null && videoCapture.isOpened()) {
+        kField.textProperty().addListener((obs, old, neu) -> {
+            if (getActiveTab() == TAB_DYNAMIC_KEY && videoCapture != null && videoCapture.isOpened()) {
+                showFrame(currentFrameIndex);
+            }
+        });
+
+        // Listener pour onglet 4 (k4 et autoCheckBox4)
+        kField4.textProperty().addListener((obs, old, neu) -> {
+            if (getActiveTab() == TAB_DYNAMIC_DECRYPT && videoCapture != null && videoCapture.isOpened()) {
                 showFrame(currentFrameIndex);
             }
         });
 
         // Listener pour les changements d'onglet
-        modeTabPane.getSelectionModel().selectedIndexProperty().addListener((observable, oldValue, newValue) -> {
-            handleModeChange();
-        });
+        modeTabPane.getSelectionModel().selectedIndexProperty().addListener((obs, old, neu) -> handleModeChange());
     }
 
     /**
-     * Fonction appelée à chaque changement de r ou s
-     * Affiche les nouvelles valeurs dans la console
+     * Gère le changement de l'état de la checkbox automatique pour le 4e onglet
      */
-    private void handleKeyChange(String paramName, String newValue) {
-        // Cette fonction n'est plus utilisée directement, mais conservée pour compatibilité
+    @FXML
+    private void handleAutoCheckBox() {
+        boolean isAuto = autoCheckBox4.isSelected();
+        kField4.setDisable(isAuto);
+
+        if (isAuto) {
+            System.out.println("Mode automatique activé pour déchiffrement dynamique");
+        } else {
+            System.out.println("Mode manuel activé pour déchiffrement dynamique");
+        }
+
+        if (videoCapture != null && videoCapture.isOpened()) {
+            showFrame(currentFrameIndex);
+        }
     }
+
 
     @FXML
     private void handleAutoKey() {
@@ -230,7 +273,7 @@ public class VideoPlayer extends Application {
         }
 
         int activeTab = getActiveTab();
-        if (activeTab == TAB_ENCRYPT_DYNAMIC_KEY) {
+        if (activeTab == TAB_DYNAMIC_KEY || activeTab == TAB_DYNAMIC_DECRYPT) {
             return;
         }
 
@@ -244,8 +287,6 @@ public class VideoPlayer extends Application {
         // Lancer la recherche dans un thread séparé pour ne pas bloquer l'interface
         new Thread(() -> {
             boolean isEncryptMode = (activeTab == TAB_ENCRYPT);
-            boolean isDecryptMode = (activeTab == TAB_DECRYPT);
-            boolean isEncryptWithDynamicKey = (activeTab == TAB_ENCRYPT_DYNAMIC_KEY);
             String modeText = isEncryptMode ? "chiffrement optimal" : "déchiffrement";
             System.out.println("Recherche automatique de clé pour " + modeText + "...");
 
@@ -370,6 +411,13 @@ public class VideoPlayer extends Application {
         prevButton3.setDisable(disabled);
         nextButton3.setDisable(disabled);
         openButton3.setDisable(disabled);
+
+        // Onglet 4
+        exportButton4.setDisable(disabled);
+        playButton4.setDisable(disabled);
+        prevButton4.setDisable(disabled);
+        nextButton4.setDisable(disabled);
+        openButton4.setDisable(disabled);
     }
 
     // Gère la boîte de dialogue de sauvegarde
@@ -404,7 +452,7 @@ public class VideoPlayer extends Application {
         alert.getDialogPane().setContent(progressBox);
         alert.getButtonTypes().setAll(ButtonType.CANCEL);
 
-        alert.setOnCloseRequest(event -> cancelled[0] = true);
+        alert.setOnCloseRequest(evt -> cancelled[0] = true);
         return alert;
     }
 
@@ -617,7 +665,6 @@ public class VideoPlayer extends Application {
 
     private Mat processFrame(Mat frame) {
         int activeTab = getActiveTab();
-
         try {
             if (activeTab == TAB_ENCRYPT) {
                 // Chiffrement avec r et s
@@ -639,18 +686,31 @@ public class VideoPlayer extends Application {
 
                 return Encryption.decrypt(frame, r, s);
 
-            } else if (activeTab == TAB_ENCRYPT_DYNAMIC_KEY) {
+            } else if (activeTab == TAB_DYNAMIC_KEY) {
                 // Chiffrement avec clé dynamique k
                 int k = Integer.parseInt(kField.getText());
 
                 return Encryption.dynamicEncrypt(frame, k);
-            } else {
-                return frame;
+
+            } else if (activeTab == TAB_DYNAMIC_DECRYPT) {
+                // TAB_DYNAMIC_DECRYPT: Déchiffrement avec clé dynamique k
+                boolean isAuto = autoCheckBox4.isSelected();
+
+                if (isAuto) {
+                    Key k = Encryption.findSmartKey(frame);
+
+                    return Encryption.decrypt(frame, k.getR(), k.getS());
+                } else {
+                    int k = Integer.parseInt(kField4.getText());
+
+                    return frame;
+                }
             }
         } catch (NumberFormatException e) {
             // En cas d'erreur, retourner la frame telle quelle
             return frame;
         }
+        return frame;
     }
 
     private void displayFrame(Mat originalFrame, Mat processedFrame) {

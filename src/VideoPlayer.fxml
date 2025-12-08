@@ -88,6 +88,32 @@
                     </HBox>
                 </VBox>
             </Tab>
+
+            <!-- Onglet 4: Déchiffrement avec clé dynamique -->
+            <Tab text="Déchiffrement (clé dynamique)">
+                <VBox spacing="10" BorderPane.alignment="CENTER">
+                    <padding>
+                        <Insets top="10" right="10" bottom="10" left="10" />
+                    </padding>
+
+                    <!-- Paramètre k et bouton automatique -->
+                    <HBox spacing="15" alignment="CENTER_LEFT">
+                        <Label text="k (clé initiale):" />
+                        <TextField fx:id="kField4" text="0" prefWidth="100" />
+                        <CheckBox fx:id="autoCheckBox4" text="Automatique" onAction="#handleAutoCheckBox" />
+                    </HBox>
+
+                    <!-- Contrôles de lecture -->
+                    <HBox spacing="10" alignment="CENTER_LEFT">
+                        <Button fx:id="openButton4" text="Ouvrir vidéo" onAction="#handleOpenVideo" />
+                        <Button fx:id="playButton4" text="▶ Lecture" disable="true" onAction="#handlePlayPause" />
+                        <Button fx:id="prevButton4" text="◀ Précédent" disable="true" onAction="#handlePrevFrame" />
+                        <Button fx:id="nextButton4" text="Suivant ▶" disable="true" onAction="#handleNextFrame" />
+                        <Separator orientation="VERTICAL" />
+                        <Button fx:id="exportButton4" text="💾 Exporter vidéo" disable="true" onAction="#handleExportVideo" />
+                    </HBox>
+                </VBox>
+            </Tab>
         </TabPane>
     </top>
 
