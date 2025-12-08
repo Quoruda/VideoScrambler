@@ -7,41 +7,88 @@
 
 <BorderPane xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="VideoPlayer">
     <top>
-        <VBox spacing="10" BorderPane.alignment="CENTER">
-            <padding>
-                <Insets top="10" right="10" bottom="10" left="10" />
-            </padding>
+        <TabPane fx:id="modeTabPane" tabClosingPolicy="UNAVAILABLE">
+            <!-- Onglet 1: Chiffrement classique (r, s) -->
+            <Tab text="Chiffrement (r, s)">
+                <VBox spacing="10" BorderPane.alignment="CENTER">
+                    <padding>
+                        <Insets top="10" right="10" bottom="10" left="10" />
+                    </padding>
 
-            <!-- Sélection du mode -->
-            <HBox spacing="10" alignment="CENTER_LEFT">
-                <Label text="Mode:" />
-                <RadioButton fx:id="encryptModeRadio" text="Chiffrement" selected="true" onAction="#handleModeChange">
-                    <toggleGroup>
-                        <ToggleGroup fx:id="modeGroup" />
-                    </toggleGroup>
-                </RadioButton>
-                <RadioButton fx:id="decryptModeRadio" text="Déchiffrement" toggleGroup="$modeGroup" onAction="#handleModeChange" />
-            </HBox>
+                    <!-- Paramètres r et s -->
+                    <HBox spacing="15" alignment="CENTER_LEFT">
+                        <Label text="r (0-255):" />
+                        <TextField fx:id="rField" text="3" prefWidth="80" />
+                        <Label text="s (0-127):" />
+                        <TextField fx:id="sField" text="7" prefWidth="80" />
+                        <Button fx:id="autoButton" text="🔍 Automatique" onAction="#handleAutoKey" />
+                    </HBox>
 
-            <!-- Paramètres r et s -->
-            <HBox spacing="15" alignment="CENTER_LEFT">
-                <Label text="r (0-255):" />
-                <TextField fx:id="rField" text="3" prefWidth="80" />
-                <Label text="s (0-127):" />
-                <TextField fx:id="sField" text="7" prefWidth="80" />
-                <Button fx:id="autoButton" text="🔍 Automatique" onAction="#handleAutoKey" />
-            </HBox>
+                    <!-- Contrôles de lecture -->
+                    <HBox spacing="10" alignment="CENTER_LEFT">
+                        <Button fx:id="openButton" text="Ouvrir vidéo" onAction="#handleOpenVideo" />
+                        <Button fx:id="playButton" text="▶ Lecture" disable="true" onAction="#handlePlayPause" />
+                        <Button fx:id="prevButton" text="◀ Précédent" disable="true" onAction="#handlePrevFrame" />
+                        <Button fx:id="nextButton" text="Suivant ▶" disable="true" onAction="#handleNextFrame" />
+                        <Separator orientation="VERTICAL" />
+                        <Button fx:id="exportButton" text="💾 Exporter vidéo" disable="true" onAction="#handleExportVideo" />
+                    </HBox>
+                </VBox>
+            </Tab>
 
-            <!-- Contrôles de lecture -->
-            <HBox spacing="10" alignment="CENTER_LEFT">
-                <Button fx:id="openButton" text="Ouvrir vidéo" onAction="#handleOpenVideo" />
-                <Button fx:id="playButton" text="▶ Lecture" disable="true" onAction="#handlePlayPause" />
-                <Button fx:id="prevButton" text="◀ Précédent" disable="true" onAction="#handlePrevFrame" />
-                <Button fx:id="nextButton" text="Suivant ▶" disable="true" onAction="#handleNextFrame" />
-                <Separator orientation="VERTICAL" />
-                <Button fx:id="exportButton" text="💾 Exporter vidéo" disable="true" onAction="#handleExportVideo" />
-            </HBox>
-        </VBox>
+            <!-- Onglet 2: Déchiffrement classique (r, s) -->
+            <Tab text="Déchiffrement (r, s)">
+                <VBox spacing="10" BorderPane.alignment="CENTER">
+                    <padding>
+                        <Insets top="10" right="10" bottom="10" left="10" />
+                    </padding>
+
+                    <!-- Paramètres r et s -->
+                    <HBox spacing="15" alignment="CENTER_LEFT">
+                        <Label text="r (0-255):" />
+                        <TextField fx:id="rField2" text="3" prefWidth="80" />
+                        <Label text="s (0-127):" />
+                        <TextField fx:id="sField2" text="7" prefWidth="80" />
+                        <Button fx:id="autoButton2" text="🔍 Automatique" onAction="#handleAutoKey" />
+                    </HBox>
+
+                    <!-- Contrôles de lecture -->
+                    <HBox spacing="10" alignment="CENTER_LEFT">
+                        <Button fx:id="openButton2" text="Ouvrir vidéo" onAction="#handleOpenVideo" />
+                        <Button fx:id="playButton2" text="▶ Lecture" disable="true" onAction="#handlePlayPause" />
+                        <Button fx:id="prevButton2" text="◀ Précédent" disable="true" onAction="#handlePrevFrame" />
+                        <Button fx:id="nextButton2" text="Suivant ▶" disable="true" onAction="#handleNextFrame" />
+                        <Separator orientation="VERTICAL" />
+                        <Button fx:id="exportButton2" text="💾 Exporter vidéo" disable="true" onAction="#handleExportVideo" />
+                    </HBox>
+                </VBox>
+            </Tab>
+
+            <!-- Onglet 3: Chiffrement avec clé dynamique -->
+            <Tab text="Chiffrement (clé dynamique)">
+                <VBox spacing="10" BorderPane.alignment="CENTER">
+                    <padding>
+                        <Insets top="10" right="10" bottom="10" left="10" />
+                    </padding>
+
+                    <!-- Paramètre k -->
+                    <HBox spacing="15" alignment="CENTER_LEFT">
+                        <Label text="k (clé initiale):" />
+                        <TextField fx:id="kField" text="0" prefWidth="100" />
+                    </HBox>
+
+                    <!-- Contrôles de lecture -->
+                    <HBox spacing="10" alignment="CENTER_LEFT">
+                        <Button fx:id="openButton3" text="Ouvrir vidéo" onAction="#handleOpenVideo" />
+                        <Button fx:id="playButton3" text="▶ Lecture" disable="true" onAction="#handlePlayPause" />
+                        <Button fx:id="prevButton3" text="◀ Précédent" disable="true" onAction="#handlePrevFrame" />
+                        <Button fx:id="nextButton3" text="Suivant ▶" disable="true" onAction="#handleNextFrame" />
+                        <Separator orientation="VERTICAL" />
+                        <Button fx:id="exportButton3" text="💾 Exporter vidéo" disable="true" onAction="#handleExportVideo" />
+                    </HBox>
+                </VBox>
+            </Tab>
+        </TabPane>
     </top>
 
     <center>

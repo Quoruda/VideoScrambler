@@ -1,10 +1,10 @@
 import org.opencv.core.Mat;
+import org.opencv.core.Point;
 import org.opencv.imgproc.Imgproc;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
+import javax.swing.text.Position;
+import java.util.*;
+
 
 public class Encryption {
 
@@ -238,30 +238,6 @@ public class Encryption {
         return bestRKey;
     }
 
-    public static Key findKeyForEncryption(Mat frame) {
-        HashMap<Key, Double> keysQualityHashmap = new HashMap<>();
-
-
-        for (int s = 0; s < 128; s+=1) {
-            for (int r = 1; r < 256; r+=64) {
-                findKeyProcessForDecryption(keysQualityHashmap, new Key(r, s), frame);
-            }
-        }
-        // s_median
-        ArrayList<Key> keys = new ArrayList<Key>(keysQualityHashmap.keySet());
-        keys.sort(Comparator.comparingDouble(keysQualityHashmap::get));
-
-        int s = keys.getFirst().getS();
-
-        keysQualityHashmap.clear();
-        for(int r = 0; r < 256; r+=1) {
-            findKeyProcessForDecryption(keysQualityHashmap, new Key(r, s), frame);
-        }
-        keys = new ArrayList<Key>(keysQualityHashmap.keySet());
-        keys.sort(Comparator.comparingDouble(keysQualityHashmap::get));
-
-        return keys.getFirst();
-    }
 
     public static int findSmartS(Mat input) {
         if (input == null || input.empty()) return 0;
@@ -359,5 +335,76 @@ public class Encryption {
         int s = findSmartS(input);
         int r = findSmartR(input, s);
         return new Key(r, s);
+    }
+
+
+    public static ArrayList<Point> getPositionsForDynamicEncryption(int height, int width, int k) {
+        SplittableRandom random = new SplittableRandom(k);
+        ArrayList<Point> positions = new ArrayList<>();
+
+        int x = random.nextInt(width);
+        int y = random.nextInt(height);
+
+        while (positions.size() < 15) {
+            while (positions.contains(new Point(x, y))) {
+                x = random.nextInt(width);
+                y = random.nextInt(height);
+            }
+            positions.add(new Point(x, y));
+        }
+
+        return positions;
+    }
+
+    public static Mat dynamicEncrypt(Mat input, int k) {
+        int height = input.rows();
+        int width = input.cols();
+        ArrayList<Point> positions = getPositionsForDynamicEncryption(height, width, k);
+
+        Random random = new Random();
+        int r = random.nextInt(256);
+        int s = random.nextInt(128);
+
+        Mat encrypted = encrypt(input, r, s);
+
+        boolean[] keyBits = new boolean[15];
+
+        for (int i = 0; i < 8; i++) {
+            keyBits[i] = ((r >> i) & 1) == 1;
+        }
+        for (int i = 0; i < 7; i++) {
+            keyBits[8 + i] = ((s >> i) & 1) == 1;
+        }
+
+        for (int i = 0; i < 15; i++) {
+            Point p = positions.get(i);
+            int row = (int) p.y;
+            int col = (int) p.x;
+            boolean bitToHide = keyBits[i];
+
+            // Lire le pixel (dans un tableau de double ou byte selon l'implémentation OpenCV)
+            double[] pixel = encrypted.get(row, col);
+
+            // On ne modifie qu'un seul canal (le Bleu/Gris, souvent l'indice 0)
+            int channelIndex = 0;
+
+            // Extraire la valeur entière du canal (0-255)
+            // On prend le premier canal (Blue ou Grayscale)
+            int channelValue = (int) pixel[channelIndex];
+
+            // Mise à jour de l'LSB :
+            // 1. channelValue & 0xFE : Met le LSB à zéro.
+            // 2. | (bitToHide ? 1 : 0) : Ajoute le bit de la clé.
+            int newValue = (channelValue & 0xFE) | (bitToHide ? 1 : 0);
+
+            // Réinjecter la nouvelle valeur dans le pixel
+            pixel[channelIndex] = newValue;
+
+            // Mettre à jour la Mat
+            encrypted.put(row, col, pixel);
+        }
+
+        return encrypted;
+
     }
 }

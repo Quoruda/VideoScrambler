@@ -16,8 +16,8 @@ import org.opencv.videoio.VideoCapture;
 import org.opencv.videoio.VideoWriter;
 import org.opencv.videoio.Videoio;
 
-import java.io.Console;
 import java.io.File;
+import java.util.Random;
 
 public class VideoPlayer extends Application {
 
@@ -25,11 +25,9 @@ public class VideoPlayer extends Application {
 
     // Composants de l'interface
     @FXML
-    private RadioButton encryptModeRadio;
+    private TabPane modeTabPane;
 
-    @FXML
-    private RadioButton decryptModeRadio;
-
+    // Onglet 1: Chiffrement (r, s)
     @FXML
     private TextField rField;
 
@@ -38,18 +36,6 @@ public class VideoPlayer extends Application {
 
     @FXML
     private Button autoButton;
-
-    @FXML
-    private Label inputLabel;
-
-    @FXML
-    private Label outputLabel;
-
-    @FXML
-    private ImageView inputImageView;
-
-    @FXML
-    private ImageView outputImageView;
 
     @FXML
     private Button openButton;
@@ -66,10 +52,65 @@ public class VideoPlayer extends Application {
     @FXML
     private Button exportButton;
 
+    // Onglet 2: Déchiffrement (r, s)
+    @FXML
+    private TextField rField2;
+
+    @FXML
+    private TextField sField2;
+
+    @FXML
+    private Button autoButton2;
+
+    @FXML
+    private Button openButton2;
+
+    @FXML
+    private Button playButton2;
+
+    @FXML
+    private Button prevButton2;
+
+    @FXML
+    private Button nextButton2;
+
+    @FXML
+    private Button exportButton2;
+
+    // Onglet 3: Chiffrement avec clé dynamique (k)
+    @FXML
+    private TextField kField;
+
+    @FXML
+    private Button openButton3;
+
+    @FXML
+    private Button playButton3;
+
+    @FXML
+    private Button prevButton3;
+
+    @FXML
+    private Button nextButton3;
+
+    @FXML
+    private Button exportButton3;
+
+    @FXML
+    private Label inputLabel;
+
+    @FXML
+    private Label outputLabel;
+
+    @FXML
+    private ImageView inputImageView;
+
+    @FXML
+    private ImageView outputImageView;
+
     // Variables pour la gestion de la vidéo
     private VideoCapture videoCapture;
     private String currentVideoPath;
-    private Mat currentFrame;
     private int currentFrameIndex = 0;
     private int totalFrames = 0;
     private Stage stage;
@@ -79,7 +120,10 @@ public class VideoPlayer extends Application {
     private double fps = 30.0;
     private long lastFrameTime = 0;
 
-    private boolean isEncryptMode = true;
+    // Variable pour tracker le mode actif selon l'onglet
+    private static final int TAB_ENCRYPT = 0;
+    private static final int TAB_DECRYPT = 1;
+    private static final int TAB_ENCRYPT_DYNAMIC_KEY = 2;
 
     @Override
     public void start(Stage primaryStage) throws Exception {
@@ -89,7 +133,6 @@ public class VideoPlayer extends Application {
         VideoPlayer controller = loader.getController();
         controller.stage = primaryStage;
 
-        // Ajouter les listeners sur les champs r et s
         controller.setupKeyChangeListeners();
 
         Scene scene = new Scene(root, 1000, 550);
@@ -98,16 +141,27 @@ public class VideoPlayer extends Application {
         primaryStage.show();
     }
 
+    /**
+     * Retourne l'index de l'onglet actif
+     */
+    private int getActiveTab() {
+        return modeTabPane.getSelectionModel().getSelectedIndex();
+    }
+
+
     @FXML
     private void handleModeChange() {
-        isEncryptMode = encryptModeRadio.isSelected();
+        int activeTab = getActiveTab();
 
-        if (isEncryptMode) {
+        if (activeTab == TAB_ENCRYPT) {
             inputLabel.setText("Vidéo d'entrée (claire)");
             outputLabel.setText("Vidéo de sortie (chiffrée)");
-        } else {
+        } else if (activeTab == TAB_DECRYPT) {
             inputLabel.setText("Vidéo d'entrée (chiffrée)");
             outputLabel.setText("Vidéo de sortie (déchiffrée)");
+        } else {
+            inputLabel.setText("Vidéo d'entrée (claire)");
+            outputLabel.setText("Vidéo de sortie (chiffrée - clé dynamique)");
         }
 
         if (videoCapture != null && videoCapture.isOpened()) {
@@ -116,11 +170,44 @@ public class VideoPlayer extends Application {
     }
 
     /**
-     * Configure les listeners sur les champs r et s pour détecter les changements
+     * Configure les listeners sur les champs r, s et k pour détecter les changements
      */
     private void setupKeyChangeListeners() {
-        rField.textProperty().addListener((observable, oldValue, newValue) -> handleKeyChange("r", newValue));
-        sField.textProperty().addListener((observable, oldValue, newValue) -> handleKeyChange("s", newValue));
+        // Listeners pour onglet 1 (r, s)
+        rField.textProperty().addListener((observable, oldValue, newValue) -> {
+            if (getActiveTab() == TAB_ENCRYPT && videoCapture != null && videoCapture.isOpened()) {
+                showFrame(currentFrameIndex);
+            }
+        });
+        sField.textProperty().addListener((observable, oldValue, newValue) -> {
+            if (getActiveTab() == TAB_ENCRYPT && videoCapture != null && videoCapture.isOpened()) {
+                showFrame(currentFrameIndex);
+            }
+        });
+
+        // Listeners pour onglet 2 (r, s)
+        rField2.textProperty().addListener((observable, oldValue, newValue) -> {
+            if (getActiveTab() == TAB_DECRYPT && videoCapture != null && videoCapture.isOpened()) {
+                showFrame(currentFrameIndex);
+            }
+        });
+        sField2.textProperty().addListener((observable, oldValue, newValue) -> {
+            if (getActiveTab() == TAB_DECRYPT && videoCapture != null && videoCapture.isOpened()) {
+                showFrame(currentFrameIndex);
+            }
+        });
+
+        // Listener pour onglet 3 (k)
+        kField.textProperty().addListener((observable, oldValue, newValue) -> {
+            if (getActiveTab() == TAB_ENCRYPT_DYNAMIC_KEY && videoCapture != null && videoCapture.isOpened()) {
+                showFrame(currentFrameIndex);
+            }
+        });
+
+        // Listener pour les changements d'onglet
+        modeTabPane.getSelectionModel().selectedIndexProperty().addListener((observable, oldValue, newValue) -> {
+            handleModeChange();
+        });
     }
 
     /**
@@ -128,19 +215,7 @@ public class VideoPlayer extends Application {
      * Affiche les nouvelles valeurs dans la console
      */
     private void handleKeyChange(String paramName, String newValue) {
-        try {
-            int r = Integer.parseInt(rField.getText());
-            int s = Integer.parseInt(sField.getText());
-
-            if (r < 0 || r > 255) return;
-            if (s < 0 || s > 127) return;
-
-            if (videoCapture != null && videoCapture.isOpened()) {
-                showFrame(currentFrameIndex);
-            }
-        } catch (NumberFormatException e) {
-            // Ignore les valeurs non numériques pendant la saisie
-        }
+        // Cette fonction n'est plus utilisée directement, mais conservée pour compatibilité
     }
 
     @FXML
@@ -154,12 +229,23 @@ public class VideoPlayer extends Application {
             return;
         }
 
+        int activeTab = getActiveTab();
+        if (activeTab == TAB_ENCRYPT_DYNAMIC_KEY) {
+            return;
+        }
+
         // Désactiver les contrôles pendant la recherche
-        autoButton.setDisable(true);
-        playButton.setDisable(true);
+        Button activeAutoButton = (activeTab == TAB_ENCRYPT) ? autoButton : autoButton2;
+        Button activePlayButton = (activeTab == TAB_ENCRYPT) ? playButton : playButton2;
+
+        activeAutoButton.setDisable(true);
+        activePlayButton.setDisable(true);
 
         // Lancer la recherche dans un thread séparé pour ne pas bloquer l'interface
         new Thread(() -> {
+            boolean isEncryptMode = (activeTab == TAB_ENCRYPT);
+            boolean isDecryptMode = (activeTab == TAB_DECRYPT);
+            boolean isEncryptWithDynamicKey = (activeTab == TAB_ENCRYPT_DYNAMIC_KEY);
             String modeText = isEncryptMode ? "chiffrement optimal" : "déchiffrement";
             System.out.println("Recherche automatique de clé pour " + modeText + "...");
 
@@ -170,8 +256,8 @@ public class VideoPlayer extends Application {
 
             if (frame == null) {
                 javafx.application.Platform.runLater(() -> {
-                    autoButton.setDisable(false);
-                    playButton.setDisable(false);
+                    activeAutoButton.setDisable(false);
+                    activePlayButton.setDisable(false);
                 });
                 return;
             }
@@ -179,17 +265,23 @@ public class VideoPlayer extends Application {
             // Choisir la fonction selon le mode
             Key key;
             if (isEncryptMode) {
-                key = Encryption.findKeyForEncryption(frame);
-                System.out.println("Clé de chiffrement optimal trouvée: r=" + key.getR() + ", s=" + key.getS());
+                Random rnd = new Random();
+                int rInit = rnd.nextInt(256);
+                int sInit = rnd.nextInt(128);
+                key = new Key(rInit, sInit);
+                System.out.println("Clé de chiffrement générée aléatoirement: r=" + key.getR() + ", s=" + key.getS());
             } else {
-                key = Encryption.findSmartKey(frame);
+                key = Encryption.findKeyForDecryption(frame);
                 System.out.println("Clé de déchiffrement trouvée: r=" + key.getR() + ", s=" + key.getS());
             }
 
             // Mettre à jour l'interface dans le thread JavaFX
             javafx.application.Platform.runLater(() -> {
-                rField.setText(String.valueOf(key.getR()));
-                sField.setText(String.valueOf(key.getS()));
+                TextField activeRField = (activeTab == TAB_ENCRYPT) ? rField : rField2;
+                TextField activeSField = (activeTab == TAB_ENCRYPT) ? sField : sField2;
+
+                activeRField.setText(String.valueOf(key.getR()));
+                activeSField.setText(String.valueOf(key.getS()));
 
                 // Rafraîchir l'affichage avec la nouvelle clé
                 showFrame(currentFrameIndex);
@@ -208,8 +300,8 @@ public class VideoPlayer extends Application {
                 alert.showAndWait();
 
                 // Réactiver les contrôles
-                autoButton.setDisable(false);
-                playButton.setDisable(false);
+                activeAutoButton.setDisable(false);
+                activePlayButton.setDisable(false);
 
             });
         }).start();
@@ -256,19 +348,44 @@ public class VideoPlayer extends Application {
 
     // Gère l'activation/désactivation massive des boutons
     private void setAppBusy(boolean disabled) {
+        // Onglet 1
         exportButton.setDisable(disabled);
         playButton.setDisable(disabled);
         prevButton.setDisable(disabled);
         nextButton.setDisable(disabled);
         openButton.setDisable(disabled);
         autoButton.setDisable(disabled);
+
+        // Onglet 2
+        exportButton2.setDisable(disabled);
+        playButton2.setDisable(disabled);
+        prevButton2.setDisable(disabled);
+        nextButton2.setDisable(disabled);
+        openButton2.setDisable(disabled);
+        autoButton2.setDisable(disabled);
+
+        // Onglet 3
+        exportButton3.setDisable(disabled);
+        playButton3.setDisable(disabled);
+        prevButton3.setDisable(disabled);
+        nextButton3.setDisable(disabled);
+        openButton3.setDisable(disabled);
     }
 
     // Gère la boîte de dialogue de sauvegarde
     private File promptForSaveFile() {
         FileChooser fileChooser = new FileChooser();
         fileChooser.setTitle("Enregistrer la vidéo");
-        fileChooser.setInitialFileName(isEncryptMode ? "video_chiffree.mkv" : "video_dechiffree.mkv");
+
+        int activeTab = getActiveTab();
+        String defaultFileName;
+        if (activeTab == TAB_DECRYPT) {
+            defaultFileName = "video_dechiffree.mkv";
+        } else {
+            defaultFileName = "video_chiffree.mkv";
+        }
+
+        fileChooser.setInitialFileName(defaultFileName);
         fileChooser.getExtensionFilters().add(
                 new FileChooser.ExtensionFilter("Fichiers MKV", "*.mkv")
         );
@@ -499,18 +616,36 @@ public class VideoPlayer extends Application {
     }
 
     private Mat processFrame(Mat frame) {
+        int activeTab = getActiveTab();
+
         try {
-            int r = Integer.parseInt(rField.getText());
-            int s = Integer.parseInt(sField.getText());
+            if (activeTab == TAB_ENCRYPT) {
+                // Chiffrement avec r et s
+                int r = Integer.parseInt(rField.getText());
+                int s = Integer.parseInt(sField.getText());
 
-            // Valider les valeurs
-            if (r < 0 || r > 255) r = 3;
-            if (s < 0 || s > 127) s = 7;
+                if (r < 0 || r > 255) r = 3;
+                if (s < 0 || s > 127) s = 7;
 
-            if (isEncryptMode) {
                 return Encryption.encrypt(frame, r, s);
-            } else {
+
+            } else if (activeTab == TAB_DECRYPT) {
+                // Déchiffrement avec r et s
+                int r = Integer.parseInt(rField2.getText());
+                int s = Integer.parseInt(sField2.getText());
+
+                if (r < 0 || r > 255) r = 3;
+                if (s < 0 || s > 127) s = 7;
+
                 return Encryption.decrypt(frame, r, s);
+
+            } else if (activeTab == TAB_ENCRYPT_DYNAMIC_KEY) {
+                // Chiffrement avec clé dynamique k
+                int k = Integer.parseInt(kField.getText());
+
+                return Encryption.dynamicEncrypt(frame, k);
+            } else {
+                return frame;
             }
         } catch (NumberFormatException e) {
             // En cas d'erreur, retourner la frame telle quelle
@@ -593,5 +728,7 @@ public class VideoPlayer extends Application {
     public static void main(String[] args) {
         launch(args);
     }
+
+
 }
 
