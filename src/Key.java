@@ -1,6 +1,6 @@
 public class Key {
-    private int r;
-    private int s;
+    public int r;
+    public int s;
     
     public Key(int r, int s) {
         this.r = r;

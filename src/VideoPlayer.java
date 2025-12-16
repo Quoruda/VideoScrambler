@@ -1,5 +1,6 @@
 import javafx.animation.AnimationTimer;
 import javafx.application.Application;
+import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
@@ -17,136 +18,53 @@ import org.opencv.videoio.VideoWriter;
 import org.opencv.videoio.Videoio;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Random;
+import java.util.function.Function;
 
 public class VideoPlayer extends Application {
 
     static { System.loadLibrary(Core.NATIVE_LIBRARY_NAME); }
 
-    // Composants de l'interface
-    @FXML
-    private TabPane modeTabPane;
+    // --- INJECTION FXML ---
+    @FXML private TabPane modeTabPane;
+    @FXML private Label inputLabel, outputLabel;
+    @FXML private ImageView inputImageView, outputImageView;
 
-    // Onglet 1: Chiffrement (r, s)
-    @FXML
-    private TextField rField;
+    // Onglet 1
+    @FXML private TextField rField, sField;
+    @FXML private Button autoButton, openButton, playButton, prevButton, nextButton, exportButton;
 
-    @FXML
-    private TextField sField;
+    // Onglet 2
+    @FXML private TextField rField2, sField2;
+    @FXML private Button autoButton2, openButton2, playButton2, prevButton2, nextButton2, exportButton2;
 
-    @FXML
-    private Button autoButton;
+    // Onglet 3
+    @FXML private TextField kField;
+    @FXML private Button openButton3, playButton3, prevButton3, nextButton3, exportButton3;
 
-    @FXML
-    private Button openButton;
+    // Onglet 4
+    @FXML private TextField kField4;
+    @FXML private CheckBox autoCheckBox4;
+    @FXML private Button openButton4, playButton4, prevButton4, nextButton4, exportButton4;
 
-    @FXML
-    private Button playButton;
 
-    @FXML
-    private Button prevButton;
+    // --- LOGIQUE INTERNE ---
 
-    @FXML
-    private Button nextButton;
+    private final List<TabContext> tabs = new ArrayList<>();
 
-    @FXML
-    private Button exportButton;
-
-    // Onglet 2: Déchiffrement (r, s)
-    @FXML
-    private TextField rField2;
-
-    @FXML
-    private TextField sField2;
-
-    @FXML
-    private Button autoButton2;
-
-    @FXML
-    private Button openButton2;
-
-    @FXML
-    private Button playButton2;
-
-    @FXML
-    private Button prevButton2;
-
-    @FXML
-    private Button nextButton2;
-
-    @FXML
-    private Button exportButton2;
-
-    // Onglet 3: Chiffrement avec clé dynamique (k)
-    @FXML
-    private TextField kField;
-
-    @FXML
-    private Button openButton3;
-
-    @FXML
-    private Button playButton3;
-
-    @FXML
-    private Button prevButton3;
-
-    @FXML
-    private Button nextButton3;
-
-    @FXML
-    private Button exportButton3;
-
-    // Onglet 4: Déchiffrement avec clé dynamique (k)
-    @FXML
-    private TextField kField4;
-
-    @FXML
-    private CheckBox autoCheckBox4;
-
-    @FXML
-    private Button openButton4;
-
-    @FXML
-    private Button playButton4;
-
-    @FXML
-    private Button prevButton4;
-
-    @FXML
-    private Button nextButton4;
-
-    @FXML
-    private Button exportButton4;
-
-    @FXML
-    private Label inputLabel;
-
-    @FXML
-    private Label outputLabel;
-
-    @FXML
-    private ImageView inputImageView;
-
-    @FXML
-    private ImageView outputImageView;
-
-    // Variables pour la gestion de la vidéo
+    private Stage stage;
     private VideoCapture videoCapture;
     private String currentVideoPath;
-    private int currentFrameIndex = 0;
-    private int totalFrames = 0;
-    private Stage stage;
 
+    // État de lecture
     private AnimationTimer playTimer;
     private boolean isPlaying = false;
+    private int currentFrameIndex = 0;
+    private int totalFrames = 0;
     private double fps = 30.0;
     private long lastFrameTime = 0;
-
-    // Variable pour tracker le mode actif selon l'onglet
-    private static final int TAB_ENCRYPT = 0;
-    private static final int TAB_DECRYPT = 1;
-    private static final int TAB_DYNAMIC_KEY = 2;
-    private static final int TAB_DYNAMIC_DECRYPT = 3;
 
     @Override
     public void start(Stage primaryStage) throws Exception {
@@ -156,486 +74,167 @@ public class VideoPlayer extends Application {
         VideoPlayer controller = loader.getController();
         controller.stage = primaryStage;
 
-        controller.setupKeyChangeListeners();
-
         Scene scene = new Scene(root, 1000, 550);
         primaryStage.setTitle("Chiffrement/Déchiffrement de Vidéo");
         primaryStage.setScene(scene);
         primaryStage.show();
     }
 
-    /**
-     * Retourne l'index de l'onglet actif
-     */
-    private int getActiveTab() {
-        return modeTabPane.getSelectionModel().getSelectedIndex();
+    @FXML
+    public void initialize() {
+        // Configuration Onglet 0 : Chiffrement (r, s)
+        tabs.add(new TabContext(
+                "Vidéo d'entrée (claire)", "Vidéo de sortie (chiffrée)",
+                openButton, playButton, prevButton, nextButton, exportButton, autoButton,
+                frame -> {
+                    int r = parse(rField, 3);
+                    int s = parse(sField, 7);
+                    return Encryption.encrypt(frame, r, s);
+                }
+        ).addInputs(rField, sField));
+
+        // Configuration Onglet 1 : Déchiffrement (r, s)
+        tabs.add(new TabContext(
+                "Vidéo d'entrée (chiffrée)", "Vidéo de sortie (déchiffrée)",
+                openButton2, playButton2, prevButton2, nextButton2, exportButton2, autoButton2,
+                frame -> {
+                    int r = parse(rField2, 3);
+                    int s = parse(sField2, 7);
+                    return Encryption.decrypt(frame, r, s);
+                }
+        ).addInputs(rField2, sField2));
+
+        // Configuration Onglet 2 : Chiffrement Dynamique (k)
+        tabs.add(new TabContext(
+                "Vidéo d'entrée (claire)", "Vidéo de sortie (chiffrée - dynamique)",
+                openButton3, playButton3, prevButton3, nextButton3, exportButton3, null,
+                frame -> {
+                    int k = parse(kField, 0);
+                    return Encryption.dynamicEncrypt(frame, k);
+                }
+        ).addInputs(kField));
+
+        // Configuration Onglet 3 : Déchiffrement Dynamique (k)
+        tabs.add(new TabContext(
+                "Vidéo d'entrée (chiffrée)", "Vidéo de sortie (déchiffrée - dynamique)",
+                openButton4, playButton4, prevButton4, nextButton4, exportButton4, null,
+                frame -> {
+                    if (autoCheckBox4.isSelected()) {
+                        Key k = Encryption.bruteForceCrack(frame);
+                        return Encryption.decrypt(frame, k.r, k.s);
+                    } else {
+                        int k = parse(kField4, 0);
+                        return Encryption.dynamicDecrypt(frame, k);
+                    }
+                }
+        ).addInputs(kField4));
+
+        // Listener global pour le changement d'onglet
+        modeTabPane.getSelectionModel().selectedIndexProperty().addListener((obs, old, neu) -> updateUIForActiveTab());
+
+        // Initialisation de l'état UI
+        updateUIForActiveTab();
     }
 
+    // --- GESTION DE L'INTERFACE ---
 
-    @FXML
-    private void handleModeChange() {
-        int activeTab = getActiveTab();
+    private TabContext getCurrentTab() {
+        int index = modeTabPane.getSelectionModel().getSelectedIndex();
+        if (index >= 0 && index < tabs.size()) return tabs.get(index);
+        return tabs.get(0);
+    }
 
-        if (activeTab == TAB_ENCRYPT) {
-            inputLabel.setText("Vidéo d'entrée (claire)");
-            outputLabel.setText("Vidéo de sortie (chiffrée)");
-        } else if (activeTab == TAB_DECRYPT) {
-            inputLabel.setText("Vidéo d'entrée (chiffrée)");
-            outputLabel.setText("Vidéo de sortie (déchiffrée)");
-        } else if (activeTab == TAB_DYNAMIC_KEY) {
-            inputLabel.setText("Vidéo d'entrée (claire)");
-            outputLabel.setText("Vidéo de sortie (chiffrée - clé dynamique)");
-        } else {
-            inputLabel.setText("Vidéo d'entrée (chiffrée)");
-            outputLabel.setText("Vidéo de sortie (déchiffrée - clé dynamique)");
-        }
+    private void updateUIForActiveTab() {
+        TabContext current = getCurrentTab();
+        inputLabel.setText(current.inputLabel);
+        outputLabel.setText(current.outputLabel);
+        refreshDisplay();
+    }
 
+    private void refreshDisplay() {
         if (videoCapture != null && videoCapture.isOpened()) {
             showFrame(currentFrameIndex);
         }
     }
 
-    /**
-     * Configure les listeners sur les champs r, s et k pour détecter les changements
-     */
-    private void setupKeyChangeListeners() {
-        // Listeners pour onglet 1 (r, s)
-        rField.textProperty().addListener((obs, old, neu) -> {
-            if (getActiveTab() == TAB_ENCRYPT && videoCapture != null && videoCapture.isOpened()) {
-                showFrame(currentFrameIndex);
-            }
-        });
-        sField.textProperty().addListener((obs, old, neu) -> {
-            if (getActiveTab() == TAB_ENCRYPT && videoCapture != null && videoCapture.isOpened()) {
-                showFrame(currentFrameIndex);
-            }
-        });
-
-        // Listeners pour onglet 2 (r, s)
-        rField2.textProperty().addListener((obs, old, neu) -> {
-            if (getActiveTab() == TAB_DECRYPT && videoCapture != null && videoCapture.isOpened()) {
-                showFrame(currentFrameIndex);
-            }
-        });
-        sField2.textProperty().addListener((obs, old, neu) -> {
-            if (getActiveTab() == TAB_DECRYPT && videoCapture != null && videoCapture.isOpened()) {
-                showFrame(currentFrameIndex);
-            }
-        });
-
-        // Listener pour onglet 3 (k)
-        kField.textProperty().addListener((obs, old, neu) -> {
-            if (getActiveTab() == TAB_DYNAMIC_KEY && videoCapture != null && videoCapture.isOpened()) {
-                showFrame(currentFrameIndex);
-            }
-        });
-
-        // Listener pour onglet 4 (k4 et autoCheckBox4)
-        kField4.textProperty().addListener((obs, old, neu) -> {
-            if (getActiveTab() == TAB_DYNAMIC_DECRYPT && videoCapture != null && videoCapture.isOpened()) {
-                showFrame(currentFrameIndex);
-            }
-        });
-
-        // Listener pour les changements d'onglet
-        modeTabPane.getSelectionModel().selectedIndexProperty().addListener((obs, old, neu) -> handleModeChange());
+    private void setAllControlsDisabled(boolean disabled) {
+        tabs.forEach(tab -> tab.setControlsDisabled(disabled));
     }
 
-    /**
-     * Gère le changement de l'état de la checkbox automatique pour le 4e onglet
-     */
-    @FXML
-    private void handleAutoCheckBox() {
+    // --- ACTIONS FXML ---
+
+    @FXML private void handleOpenVideo() {
+        FileChooser fc = new FileChooser();
+        fc.getExtensionFilters().add(new FileChooser.ExtensionFilter("Vidéos", "*.mp4", "*.avi", "*.mkv"));
+        File file = fc.showOpenDialog(stage);
+        if (file != null) {
+            loadVideo(file.getAbsolutePath());
+            setAllControlsDisabled(false);
+        }
+    }
+
+    @FXML private void handlePlayPause() {
+        if (isPlaying) pauseVideo();
+        else playVideo();
+    }
+
+    @FXML private void handlePrevFrame() { navigateFrame(-1); }
+    @FXML private void handleNextFrame() { navigateFrame(1); }
+
+    @FXML private void handleAutoCheckBox() {
         boolean isAuto = autoCheckBox4.isSelected();
         kField4.setDisable(isAuto);
-
-        if (isAuto) {
-            System.out.println("Mode automatique activé pour déchiffrement dynamique");
-        } else {
-            System.out.println("Mode manuel activé pour déchiffrement dynamique");
-        }
-
-        if (videoCapture != null && videoCapture.isOpened()) {
-            showFrame(currentFrameIndex);
-        }
+        refreshDisplay();
     }
 
+    // --- GESTION VIDÉO ---
 
-    @FXML
-    private void handleAutoKey() {
-        if (videoCapture == null || !videoCapture.isOpened()) {
-            Alert alert = new Alert(Alert.AlertType.WARNING);
-            alert.setTitle("Aucune vidéo");
-            alert.setHeaderText(null);
-            alert.setContentText("Veuillez d'abord ouvrir une vidéo.");
-            alert.showAndWait();
-            return;
-        }
+    private void loadVideo(String path) {
+        if (videoCapture != null) videoCapture.release();
+        currentVideoPath = path;
+        videoCapture = new VideoCapture(path);
 
-        int activeTab = getActiveTab();
-        if (activeTab == TAB_DYNAMIC_KEY || activeTab == TAB_DYNAMIC_DECRYPT) {
-            return;
-        }
-
-        // Désactiver les contrôles pendant la recherche
-        Button activeAutoButton = (activeTab == TAB_ENCRYPT) ? autoButton : autoButton2;
-        Button activePlayButton = (activeTab == TAB_ENCRYPT) ? playButton : playButton2;
-
-        activeAutoButton.setDisable(true);
-        activePlayButton.setDisable(true);
-
-        // Lancer la recherche dans un thread séparé pour ne pas bloquer l'interface
-        new Thread(() -> {
-            boolean isEncryptMode = (activeTab == TAB_ENCRYPT);
-            String modeText = isEncryptMode ? "chiffrement optimal" : "déchiffrement";
-            System.out.println("Recherche automatique de clé pour " + modeText + "...");
-
-            // Prendre une frame aléatoire
-            java.util.Random rand = new java.util.Random();
-            int iframe = rand.nextInt(totalFrames);
-            Mat frame = readFrame(iframe);
-
-            if (frame == null) {
-                javafx.application.Platform.runLater(() -> {
-                    activeAutoButton.setDisable(false);
-                    activePlayButton.setDisable(false);
-                });
-                return;
-            }
-
-            // Choisir la fonction selon le mode
-            Key key;
-            if (isEncryptMode) {
-                Random rnd = new Random();
-                int rInit = rnd.nextInt(256);
-                int sInit = rnd.nextInt(128);
-                key = new Key(rInit, sInit);
-                System.out.println("Clé de chiffrement générée aléatoirement: r=" + key.getR() + ", s=" + key.getS());
-            } else {
-                key = Encryption.findKeyForDecryption(frame);
-                System.out.println("Clé de déchiffrement trouvée: r=" + key.getR() + ", s=" + key.getS());
-            }
-
-            // Mettre à jour l'interface dans le thread JavaFX
-            javafx.application.Platform.runLater(() -> {
-                TextField activeRField = (activeTab == TAB_ENCRYPT) ? rField : rField2;
-                TextField activeSField = (activeTab == TAB_ENCRYPT) ? sField : sField2;
-
-                activeRField.setText(String.valueOf(key.getR()));
-                activeSField.setText(String.valueOf(key.getS()));
-
-                // Rafraîchir l'affichage avec la nouvelle clé
-                showFrame(currentFrameIndex);
-
-                // Afficher un message de succès
-                Alert alert = new Alert(Alert.AlertType.INFORMATION);
-                alert.setTitle("Recherche terminée");
-                alert.setHeaderText("Clé trouvée !");
-                String contentText = "r = " + key.getR() + "\ns = " + key.getS();
-                if (isEncryptMode) {
-                    contentText += "\n\n(Clé optimale pour maximiser le brouillage)";
-                } else {
-                    contentText += "\n\n(Clé optimale pour restaurer l'image)";
-                }
-                alert.setContentText(contentText);
-                alert.showAndWait();
-
-                // Réactiver les contrôles
-                activeAutoButton.setDisable(false);
-                activePlayButton.setDisable(false);
-
-            });
-        }).start();
-    }
-
-    @FXML
-    private void handleOpenVideo() {
-        FileChooser fileChooser = new FileChooser();
-        fileChooser.setTitle("Sélectionner une vidéo");
-        fileChooser.getExtensionFilters().add(
-            new FileChooser.ExtensionFilter("Fichiers vidéo", "*.mp4", "*.avi", "*.mov", "*.mkv")
-        );
-        File file = fileChooser.showOpenDialog(stage);
-        if (file != null) {
-            openVideo(file.getAbsolutePath());
-            setAppBusy(false);
-        }
-    }
-
-    @FXML
-    private void handlePlayPause() {
-        if (isPlaying) {
-            pauseVideo();
-        } else {
-            playVideo();
-        }
-    }
-
-    @FXML
-    private void handlePrevFrame() {
-        if (currentFrameIndex > 0) {
-            currentFrameIndex--;
-            showFrame(currentFrameIndex);
-        }
-    }
-
-    @FXML
-    private void handleNextFrame() {
-        if (currentFrameIndex < totalFrames - 1) {
-            currentFrameIndex++;
-            showFrame(currentFrameIndex);
-        }
-    }
-
-    // Gère l'activation/désactivation massive des boutons
-    private void setAppBusy(boolean disabled) {
-        // Onglet 1
-        exportButton.setDisable(disabled);
-        playButton.setDisable(disabled);
-        prevButton.setDisable(disabled);
-        nextButton.setDisable(disabled);
-        openButton.setDisable(disabled);
-        autoButton.setDisable(disabled);
-
-        // Onglet 2
-        exportButton2.setDisable(disabled);
-        playButton2.setDisable(disabled);
-        prevButton2.setDisable(disabled);
-        nextButton2.setDisable(disabled);
-        openButton2.setDisable(disabled);
-        autoButton2.setDisable(disabled);
-
-        // Onglet 3
-        exportButton3.setDisable(disabled);
-        playButton3.setDisable(disabled);
-        prevButton3.setDisable(disabled);
-        nextButton3.setDisable(disabled);
-        openButton3.setDisable(disabled);
-
-        // Onglet 4
-        exportButton4.setDisable(disabled);
-        playButton4.setDisable(disabled);
-        prevButton4.setDisable(disabled);
-        nextButton4.setDisable(disabled);
-        openButton4.setDisable(disabled);
-    }
-
-    // Gère la boîte de dialogue de sauvegarde
-    private File promptForSaveFile() {
-        FileChooser fileChooser = new FileChooser();
-        fileChooser.setTitle("Enregistrer la vidéo");
-
-        int activeTab = getActiveTab();
-        String defaultFileName;
-        if (activeTab == TAB_DECRYPT) {
-            defaultFileName = "video_dechiffree.mkv";
-        } else {
-            defaultFileName = "video_chiffree.mkv";
-        }
-
-        fileChooser.setInitialFileName(defaultFileName);
-        fileChooser.getExtensionFilters().add(
-                new FileChooser.ExtensionFilter("Fichiers MKV", "*.mkv")
-        );
-        return fileChooser.showSaveDialog(stage);
-    }
-
-    // Crée la fenêtre de progression
-    private Alert createProgressAlert(ProgressBar progressBar, Label progressLabel, boolean[] cancelled) {
-        progressBar.setPrefWidth(400);
-        VBox progressBox = new VBox(10, progressLabel, progressBar);
-        progressBox.setPadding(new javafx.geometry.Insets(20));
-
-        Alert alert = new Alert(Alert.AlertType.INFORMATION);
-        alert.setTitle("Export en cours");
-        alert.setHeaderText("Traitement de la vidéo");
-        alert.getDialogPane().setContent(progressBox);
-        alert.getButtonTypes().setAll(ButtonType.CANCEL);
-
-        alert.setOnCloseRequest(evt -> cancelled[0] = true);
-        return alert;
-    }
-
-    // Gère l'affichage du résultat final (Succès ou Annulation)
-    private void handleExportCompletion(boolean success, File file, boolean wasCancelled) {
-        if (success) {
-            showAlert(Alert.AlertType.INFORMATION, "Export terminé",
-                    "La vidéo a été exportée avec succès vers :\n" + file.getAbsolutePath());
-        } else if (wasCancelled) {
-            showAlert(Alert.AlertType.WARNING, "Export annulé", "L'export de la vidéo a été annulé.");
-        } else {
-            showAlert(Alert.AlertType.ERROR, "Echec", "L'export a échoué pour une raison inconnue.");
-        }
-    }
-
-    @FXML
-    private void handleExportVideo() {
-        // 1. Validation
-        if (videoCapture == null || !videoCapture.isOpened()) {
-            showAlert(Alert.AlertType.WARNING, "Aucune vidéo", "Veuillez d'abord ouvrir une vidéo.");
-            return;
-        }
-
-        // 2. Sélection du fichier
-        File file = promptForSaveFile();
-        if (file == null) return;
-
-        // 3. Préparation de l'interface (UI)
-        setAppBusy(true); // Désactive les boutons
-
-        // Création de la modale de progression
-        ProgressBar progressBar = new ProgressBar(0);
-        Label progressLabel = new Label("Préparation de l'export...");
-        // Variable pour l'annulation (tableau pour être final/mutable dans la lambda)
-        final boolean[] cancelled = {false};
-
-        Alert progressAlert = createProgressAlert(progressBar, progressLabel, cancelled);
-        progressAlert.show();
-
-        // 4. Lancement du processus en arrière-plan
-        new Thread(() -> {
-            try {
-                // Exécution lourde
-                boolean success = exportVideoProcess(file.getAbsolutePath(), progressBar, progressLabel, cancelled);
-
-                // Mise à jour de l'UI une fois fini
-                javafx.application.Platform.runLater(() -> {
-                    progressAlert.hide();
-                    handleExportCompletion(success, file, cancelled[0]);
-                    setAppBusy(false); // Réactive les boutons
-                });
-
-            } catch (Exception e) {
-                e.printStackTrace();
-                javafx.application.Platform.runLater(() -> {
-                    progressAlert.hide();
-                    showAlert(Alert.AlertType.ERROR, "Erreur d'export", "Une erreur s'est produite : " + e.getMessage());
-                    setAppBusy(false); // Réactive les boutons
-                });
-            }
-        }).start();
-    }
-
-    // Utilitaire générique pour afficher une alerte simple
-    private void showAlert(Alert.AlertType type, String title, String content) {
-        Alert alert = new Alert(type);
-        alert.setTitle(title);
-        alert.setHeaderText(title);
-        alert.setContentText(content);
-        alert.showAndWait();
-    }
-
-    private boolean exportVideoProcess(String outputPath, ProgressBar progressBar, Label progressLabel, boolean[] cancelled) {
-        // 1. Initialisation de la lecture
-        VideoCapture exportCapture = new VideoCapture(currentVideoPath);
-        if (!exportCapture.isOpened()) {
-            throw new RuntimeException("Impossible d'ouvrir la vidéo source.");
-        }
-
-        int width = (int) exportCapture.get(Videoio.CAP_PROP_FRAME_WIDTH);
-        int height = (int) exportCapture.get(Videoio.CAP_PROP_FRAME_HEIGHT);
-        double fps = exportCapture.get(Videoio.CAP_PROP_FPS);
-        if (fps <= 0) fps = 30.0;
-
-        // 2. Initialisation de l'écriture (Codec unique : HuffYUV)
-        // 'H', 'F', 'Y', 'U' est rapide et sans perte (Lossless)
-        int fourcc = VideoWriter.fourcc('H', 'F', 'Y', 'U');
-        VideoWriter videoWriter = new VideoWriter(outputPath, fourcc, fps, new Size(width, height), true);
-
-        if (!videoWriter.isOpened()) {
-            exportCapture.release();
-            throw new RuntimeException("Erreur : Impossible d'initialiser l'encodage vidéo (Codec HFYU non supporté).");
-        }
-
-        // 3. Boucle de traitement
-        Mat frame = new Mat();
-        int processedFrames = 0;
-        final int actualTotalFrames = totalFrames > 0 ? totalFrames : 1000;
-
-        // Optimisation : Mise à jour de l'interface toutes les 1% seulement
-        int updateFrequency = Math.max(10, actualTotalFrames / 100);
-
-        try {
-            while (!cancelled[0]) {
-                if (!exportCapture.read(frame) || frame.empty()) break;
-
-                // Traitement (Chiffrer/Déchiffrer)
-                Mat processedFrame = processFrame(frame);
-
-                // Écriture
-                if (processedFrame != null && !processedFrame.empty()) {
-                    videoWriter.write(processedFrame);
-                }
-
-                processedFrames++;
-                final int current = processedFrames;
-
-                // Mise à jour de la barre de progression (Optimisée)
-                if (current % updateFrequency == 0 || current == actualTotalFrames) {
-                    double progress = (double) current / actualTotalFrames;
-                    javafx.application.Platform.runLater(() -> {
-                        progressBar.setProgress(progress);
-                        progressLabel.setText(String.format("Export : %d / %d", current, actualTotalFrames));
-                    });
-                }
-            }
-        } finally {
-            // 4. Nettoyage propre
-            videoWriter.release();
-            exportCapture.release();
-            frame.release();
-        }
-
-        return !cancelled[0] && processedFrames > 0;
-    }
-
-    private void openVideo(String videoPath) {
-        if (videoCapture != null) {
-            videoCapture.release();
-        }
-
-        currentVideoPath = videoPath;
-        videoCapture = new VideoCapture(videoPath);
         if (videoCapture.isOpened()) {
             totalFrames = (int) videoCapture.get(Videoio.CAP_PROP_FRAME_COUNT);
             fps = videoCapture.get(Videoio.CAP_PROP_FPS);
-            if (fps <= 0) fps = 30.0; // Valeur par défaut si non disponible
+            if (fps <= 0) fps = 30.0;
             currentFrameIndex = 0;
+            showFrame(0);
+        }
+    }
+
+    private void navigateFrame(int delta) {
+        int newIndex = currentFrameIndex + delta;
+        if (newIndex >= 0 && newIndex < totalFrames) {
+            currentFrameIndex = newIndex;
             showFrame(currentFrameIndex);
         }
     }
 
     private void playVideo() {
-        if (videoCapture == null || !videoCapture.isOpened()) {
-            return;
-        }
+        if (videoCapture == null || !videoCapture.isOpened()) return;
 
         isPlaying = true;
-        playButton.setText("⏸ Pause");
+        getCurrentTab().playButton.setText("⏸ Pause");
         lastFrameTime = System.nanoTime();
 
-        // Synchroniser le curseur vidéo avec l'index actuel
         videoCapture.set(Videoio.CAP_PROP_POS_FRAMES, currentFrameIndex);
 
         playTimer = new AnimationTimer() {
             @Override
             public void handle(long now) {
-                long frameDelay = (long) (1_000_000_000 / fps);
-                if (now - lastFrameTime >= frameDelay) {
+                if (now - lastFrameTime >= (1_000_000_000 / fps)) {
                     if (currentFrameIndex < totalFrames - 1) {
                         currentFrameIndex++;
-                        // Lecture séquentielle de la frame (plus rapide que readFrame qui repositionne)
                         Mat frame = new Mat();
                         if (videoCapture.read(frame) && !frame.empty()) {
-                            Mat processedFrame = processFrame(frame);
-                            displayFrame(frame, processedFrame);
+                            processAndDisplay(frame);
                         }
                         lastFrameTime = now;
                     } else {
-                        // Retour au début ou arrêt
                         pauseVideo();
                         currentFrameIndex = 0;
-                        showFrame(currentFrameIndex);
+                        showFrame(0);
                     }
                 }
             }
@@ -645,150 +244,264 @@ public class VideoPlayer extends Application {
 
     private void pauseVideo() {
         isPlaying = false;
-        playButton.setText("▶ Lecture");
-        if (playTimer != null) {
-            playTimer.stop();
-        }
+        getCurrentTab().playButton.setText("▶ Lecture");
+        if (playTimer != null) playTimer.stop();
     }
 
-    private Mat readFrame(int frameIndex) {
-        if (videoCapture == null || !videoCapture.isOpened()) {
-            return null;
-        }
-        videoCapture.set(Videoio.CAP_PROP_POS_FRAMES, frameIndex);
+    private void showFrame(int index) {
+        if (videoCapture == null || !videoCapture.isOpened()) return;
+        videoCapture.set(Videoio.CAP_PROP_POS_FRAMES, index);
         Mat frame = new Mat();
         if (videoCapture.read(frame)) {
-            return frame;
+            processAndDisplay(frame);
         }
-        return null;
     }
 
-    private Mat processFrame(Mat frame) {
-        int activeTab = getActiveTab();
+    private void processAndDisplay(Mat rawFrame) {
         try {
-            if (activeTab == TAB_ENCRYPT) {
-                // Chiffrement avec r et s
-                int r = Integer.parseInt(rField.getText());
-                int s = Integer.parseInt(sField.getText());
+            Mat processed = getCurrentTab().processor.apply(rawFrame);
+            inputImageView.setImage(matToImage(rawFrame));
+            outputImageView.setImage(matToImage(processed));
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
 
-                if (r < 0 || r > 255) r = 3;
-                if (s < 0 || s > 127) s = 7;
+    // --- ACTIONS AUTOMATIQUE & EXPORT ---
 
-                return Encryption.encrypt(frame, r, s);
+    @FXML
+    private void handleAutoKey() {
+        if (videoCapture == null) return;
 
-            } else if (activeTab == TAB_DECRYPT) {
-                // Déchiffrement avec r et s
-                int r = Integer.parseInt(rField2.getText());
-                int s = Integer.parseInt(sField2.getText());
+        TabContext current = getCurrentTab();
+        setAllControlsDisabled(true);
 
-                if (r < 0 || r > 255) r = 3;
-                if (s < 0 || s > 127) s = 7;
 
-                return Encryption.decrypt(frame, r, s);
+        Key result;
+        if (modeTabPane.getSelectionModel().getSelectedIndex() == 0) {
+            result = new Key(new Random().nextInt(256), new Random().nextInt(128));
+        } else {
 
-            } else if (activeTab == TAB_DYNAMIC_KEY) {
-                // Chiffrement avec clé dynamique k
-                int k = Integer.parseInt(kField.getText());
+            int step = Math.max(1, totalFrames / 10);
+            Mat mat = new Mat();
+            Mat bestFrame = new Mat();
 
-                return Encryption.dynamicEncrypt(frame, k);
-
-            } else if (activeTab == TAB_DYNAMIC_DECRYPT) {
-                // TAB_DYNAMIC_DECRYPT: Déchiffrement avec clé dynamique k
-                boolean isAuto = autoCheckBox4.isSelected();
-
-                if (isAuto) {
-                    Key k = Encryption.findSmartKey(frame);
-
-                    return Encryption.decrypt(frame, k.getR(), k.getS());
-                } else {
-                    int k = Integer.parseInt(kField4.getText());
-
-                    return frame;
+            double bestScore = Double.NEGATIVE_INFINITY;
+            for(int i = 0; i < totalFrames; i += step) {
+                videoCapture.set(Videoio.CAP_PROP_POS_FRAMES, i);
+                videoCapture.read(mat);
+                double score = Encryption.evaluateFrameForKeyFinding(mat);
+                if(score > bestScore) {
+                    bestScore = score;
+                    bestFrame = mat.clone();
                 }
             }
-        } catch (NumberFormatException e) {
-            // En cas d'erreur, retourner la frame telle quelle
-            return frame;
+
+            result = Encryption.bruteForceCrack(bestFrame);
         }
-        return frame;
+
+        Platform.runLater(() -> {
+            if (current.inputs.size() >= 2) {
+                current.inputs.get(0).setText(String.valueOf(result.r));
+                current.inputs.get(1).setText(String.valueOf(result.s));
+            }
+
+            showAlert("Succès", "Clé trouvée : R=" + result.r + ", S=" + result.s);
+            setAllControlsDisabled(false);
+            refreshDisplay();
+        });
+
     }
 
-    private void displayFrame(Mat originalFrame, Mat processedFrame) {
-        if (originalFrame != null && !originalFrame.empty()) {
-            Image inputImage = matToImage(originalFrame);
-            inputImageView.setImage(inputImage);
-        }
+    @FXML
+    private void handleExportVideo() {
+        if (videoCapture == null) return;
 
-        if (processedFrame != null && !processedFrame.empty()) {
-            Image outputImage = matToImage(processedFrame);
-            outputImageView.setImage(outputImage);
-        }
+        File file = promptForSave();
+        if (file == null) return;
+
+        // Arrêt de la lecture si en cours pour libérer les ressources
+        if (isPlaying) pauseVideo();
+
+        setAllControlsDisabled(true);
+
+        ProgressBar progressBar = new ProgressBar(0);
+        Alert progressDialog = createProgressDialog(progressBar);
+        progressDialog.show();
+
+        Function<Mat, Mat> currentProcessor = getCurrentTab().processor;
+
+        // Thread sécurisé avec try-catch pour garantir la fermeture de la popup
+        new Thread(() -> {
+            boolean success = false;
+            String errorMsg = "Erreur inconnue";
+
+            try {
+                success = exportLoop(file.getAbsolutePath(), currentProcessor, progressBar);
+                if (!success) errorMsg = "Impossible d'initialiser l'export (Source ou Destination invalide).";
+            } catch (Exception e) {
+                e.printStackTrace();
+                errorMsg = e.getMessage();
+                success = false;
+            }
+
+            boolean finalSuccess = success;
+            String finalErrorMsg = errorMsg;
+
+            Platform.runLater(() -> {
+                // On force la fermeture
+                progressDialog.setResult(ButtonType.CANCEL);
+                progressDialog.close();
+
+                setAllControlsDisabled(false);
+
+                if (finalSuccess) {
+                    showAlert("Export", "Export terminé avec succès !");
+                } else {
+                    showAlert("Erreur Export", "Echec de l'export : " + finalErrorMsg);
+                }
+            });
+        }).start();
     }
 
-    private void showFrame(int frameIndex) {
-        Mat frame = readFrame(frameIndex);
-        if (frame != null) {
-            Mat processedFrame = processFrame(frame);
-            displayFrame(frame, processedFrame);
+    private boolean exportLoop(String outPath, Function<Mat, Mat> processor, ProgressBar bar) {
+        VideoCapture cap = new VideoCapture(currentVideoPath);
+        if (!cap.isOpened()) {
+            System.err.println("Erreur: Impossible d'ouvrir la vidéo source pour l'export.");
+            return false;
         }
+
+        int w = (int) cap.get(Videoio.CAP_PROP_FRAME_WIDTH);
+        int h = (int) cap.get(Videoio.CAP_PROP_FRAME_HEIGHT);
+        double vidFps = cap.get(Videoio.CAP_PROP_FPS);
+        if (vidFps <= 0) vidFps = 30.0;
+
+        // --- MODIFICATION CODEC ---
+        // Utilisation de HuffYUV (HFYU)
+        // C'est un codec Lossless (Sans perte) mais beaucoup plus rapide que FFV1
+        // Le fichier sera un peu plus gros, mais l'export sera rapide.
+
+        int fourcc = VideoWriter.fourcc('H','F','Y','U');
+
+        VideoWriter writer = new VideoWriter(outPath, fourcc, vidFps, new Size(w, h), true);
+
+        if (!writer.isOpened()) {
+            System.err.println("Erreur: Impossible de créer le fichier de sortie avec HFYU. Codec manquant ?");
+            cap.release();
+            return false;
+        }
+
+        Mat frame = new Mat();
+        int count = 0;
+        int total = (int) cap.get(Videoio.CAP_PROP_FRAME_COUNT);
+        if (total <= 0) total = 1;
+
+        while (cap.read(frame) && !frame.empty()) {
+            Mat out = processor.apply(frame);
+            writer.write(out);
+            count++;
+
+            if (count % 5 == 0) { // Mise à jour de la barre plus fréquente
+                double p = (double) count / total;
+                Platform.runLater(() -> bar.setProgress(p));
+            }
+        }
+
+        writer.release();
+        cap.release();
+        return true;
+    }
+
+    // --- UTILITAIRES ---
+
+    private int parse(TextField field, int def) {
+        try { return Integer.parseInt(field.getText()); }
+        catch (Exception e) { return def; }
+    }
+
+    private File promptForSave() {
+        FileChooser fc = new FileChooser();
+        // HFYU fonctionne bien avec .avi ou .mkv
+        fc.setInitialFileName("video_export.avi");
+        fc.getExtensionFilters().add(new FileChooser.ExtensionFilter("AVI Video", "*.avi"));
+        fc.getExtensionFilters().add(new FileChooser.ExtensionFilter("MKV Video", "*.mkv"));
+        return fc.showSaveDialog(stage);
+    }
+
+    private void showAlert(String title, String content) {
+        Alert a = new Alert(Alert.AlertType.INFORMATION);
+        a.setTitle(title); a.setHeaderText(null); a.setContentText(content);
+        a.showAndWait();
+    }
+
+    private Alert createProgressDialog(ProgressBar bar) {
+        bar.setPrefWidth(300);
+        // Changement AlertType.NONE -> INFORMATION pour avoir un comportement standard de fenêtre
+        Alert a = new Alert(Alert.AlertType.INFORMATION);
+        a.setTitle("Export en cours");
+        a.setHeaderText(null);
+        a.getDialogPane().setContent(new VBox(10, new Label("Traitement en cours..."), bar));
+        // On enlève le bouton OK pour forcer l'attente (ou permettre fermeture propre via code)
+        a.getDialogPane().getButtonTypes().clear();
+        return a;
     }
 
     private Image matToImage(Mat mat) {
-        // Méthode optimisée : conversion directe sans encodage PNG
-        int width = mat.cols();
-        int height = mat.rows();
-        int channels = mat.channels();
+        int w = mat.cols(), h = mat.rows(), c = mat.channels();
+        WritableImage img = new WritableImage(w, h);
+        PixelWriter pw = img.getPixelWriter();
+        byte[] buf = new byte[w * h * c];
+        mat.get(0, 0, buf);
+        int[] pixels = new int[w * h];
 
-        WritableImage image = new WritableImage(width, height);
-        PixelWriter pixelWriter = image.getPixelWriter();
-
-        if (channels == 3) {
-            // Image BGR (OpenCV) -> RGB (JavaFX)
-            byte[] buffer = new byte[width * height * 3];
-            mat.get(0, 0, buffer);
-
-            int[] pixelBuffer = new int[width * height];
-            for (int i = 0; i < width * height; i++) {
-                int b = buffer[i * 3] & 0xFF;
-                int g = buffer[i * 3 + 1] & 0xFF;
-                int r = buffer[i * 3 + 2] & 0xFF;
-                pixelBuffer[i] = 0xFF000000 | (r << 16) | (g << 8) | b;
+        for (int i = 0; i < pixels.length; i++) {
+            if (c == 3) {
+                int b = buf[i*3]&0xFF, g = buf[i*3+1]&0xFF, r = buf[i*3+2]&0xFF;
+                pixels[i] = 0xFF000000 | (r<<16) | (g<<8) | b;
+            } else {
+                int g = buf[i]&0xFF;
+                pixels[i] = 0xFF000000 | (g<<16) | (g<<8) | g;
             }
+        }
+        pw.setPixels(0,0,w,h, PixelFormat.getIntArgbInstance(), pixels, 0, w);
+        return img;
+    }
 
-            pixelWriter.setPixels(0, 0, width, height,
-                PixelFormat.getIntArgbInstance(), pixelBuffer, 0, width);
-        } else if (channels == 1) {
-            // Image en niveaux de gris
-            byte[] buffer = new byte[width * height];
-            mat.get(0, 0, buffer);
+    // --- CLASSE INTERNE CONTEXTE ---
 
-            int[] pixelBuffer = new int[width * height];
-            for (int i = 0; i < width * height; i++) {
-                int gray = buffer[i] & 0xFF;
-                pixelBuffer[i] = 0xFF000000 | (gray << 16) | (gray << 8) | gray;
+    private class TabContext {
+        String inputLabel, outputLabel;
+        Button openButton, playButton, prevButton, nextButton, exportButton, autoButton;
+        Function<Mat, Mat> processor;
+        List<TextField> inputs = new ArrayList<>();
+
+        public TabContext(String inLbl, String outLbl,
+                          Button open, Button play, Button prev, Button next, Button export, Button auto,
+                          Function<Mat, Mat> proc) {
+            this.inputLabel = inLbl; this.outputLabel = outLbl;
+            this.openButton = open; this.playButton = play;
+            this.prevButton = prev; this.nextButton = next;
+            this.exportButton = export; this.autoButton = auto;
+            this.processor = proc;
+        }
+
+        public TabContext addInputs(TextField... fields) {
+            for (TextField f : fields) {
+                this.inputs.add(f);
+                f.textProperty().addListener((o, old, val) -> refreshDisplay());
             }
-
-            pixelWriter.setPixels(0, 0, width, height,
-                PixelFormat.getIntArgbInstance(), pixelBuffer, 0, width);
+            return this;
         }
 
-        return image;
-    }
-
-    @Override
-    public void stop() {
-        if (playTimer != null) {
-            playTimer.stop();
-        }
-        if (videoCapture != null) {
-            videoCapture.release();
+        public void setControlsDisabled(boolean disabled) {
+            if (openButton != null) openButton.setDisable(disabled);
+            if (playButton != null) playButton.setDisable(disabled);
+            if (prevButton != null) prevButton.setDisable(disabled);
+            if (nextButton != null) nextButton.setDisable(disabled);
+            if (exportButton != null) exportButton.setDisable(disabled);
+            if (autoButton != null) autoButton.setDisable(disabled);
         }
     }
 
-    public static void main(String[] args) {
-        launch(args);
-    }
-
-
+    public static void main(String[] args) { launch(args); }
 }
-
