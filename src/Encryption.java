@@ -10,6 +10,24 @@ import java.util.*;
 
 public class Encryption {
 
+    public static ArrayList<Point> getPositionsForDynamicEncryption(int height, int width, int k) {
+        SplittableRandom random = new SplittableRandom(k);
+        ArrayList<Point> positions = new ArrayList<>();
+
+        int x = random.nextInt(width);
+        int y = random.nextInt(height);
+
+        while (positions.size() < 15) {
+            while (positions.contains(new Point(x, y))) {
+                x = random.nextInt(width);
+                y = random.nextInt(height);
+            }
+            positions.add(new Point(x, y));
+        }
+
+        return positions;
+    }
+
     public static int largestPowerOf2(int n) {
         if (n <= 0) return 0;
         if (n == 1) return 1;
@@ -20,7 +38,6 @@ public class Encryption {
         }
         return power;
     }
-
 
     public static Mat encrypt(Mat input, int r, int s) {
         if (input == null || input.empty()) return input;
@@ -112,264 +129,6 @@ public class Encryption {
         return output;
     }
 
-
-    public static double pearson(byte[] x, byte[] y) {
-        int n = x.length;
-
-        double sumX = 0, sumY = 0;
-        double sumX2 = 0, sumY2 = 0;
-        double sumXY = 0;
-
-        for (int i = 0; i < n; i++) {
-            int xi = x[i] & 0xFF;
-            int yi = y[i] & 0xFF;
-
-            sumX += xi;
-            sumY += yi;
-            sumX2 += xi * xi;
-            sumY2 += yi * yi;
-            sumXY += xi * yi;
-        }
-
-        double numerator = n * sumXY - sumX * sumY;
-        double denominator = (n * sumX2 - sumX * sumX) * (n * sumY2 - sumY * sumY);
-
-        if (denominator == 0) return 0;
-        return numerator / denominator;
-    }
-
-    public static double pearsonFast(byte[] data, int r1, int r2, int length, int step) {
-        double sumX = 0, sumY = 0;
-        double sumX2 = 0, sumY2 = 0;
-        double sumXY = 0;
-
-        int xi, yi;
-
-        for (int i = 0; i < length; i+=step) {
-            xi = data[r1 * length + i] & 0xFF;
-            yi = data[r2 * length + i] & 0xFF;
-
-            sumX += xi;
-            sumY += yi;
-            sumX2 += xi * xi;
-            sumY2 += yi * yi;
-            sumXY += xi * yi;
-        }
-
-        double numerator = length * sumXY - sumX * sumY;
-        double denominator = (length * sumX2 - sumX * sumX) * (length * sumY2 - sumY * sumY);
-
-        if (denominator == 0) return 0;
-        return numerator / denominator;
-    }
-
-    public static double euclideanDistance(byte[] row1, byte[] row2) {
-        long sumSq = 0;
-
-        for (int i = 0; i < row1.length; i++) {
-            int p1 = row1[i] & 0xFF;
-            int p2 = row2[i] & 0xFF;
-
-            int diff = p1 - p2;
-
-            sumSq += diff * diff;
-        }
-
-        return -sumSq;
-    }
-
-    public static double euclideanDistanceFast(byte[] data, int r1, int r2, int length, int step) {
-        long sumSq = 0;
-        int p1, p2, diff;
-
-        for (int i = 0; i < length; i+=step) {
-            p1 = data[r1 * length + i] & 0xFF;
-            p2 = data[r2 * length + i] & 0xFF;
-
-            diff = p1 - p2;
-
-            sumSq += diff * diff;
-        }
-
-        return -sumSq;
-    }
-
-    public static double evaluateFrameForKeyFinding(Mat frame) {
-        if (frame == null || frame.empty()) return 0;
-
-        MatOfDouble mean = new MatOfDouble();
-        MatOfDouble stdDev = new MatOfDouble();
-
-        Core.meanStdDev(frame, mean, stdDev);
-
-        return 0.0722 * stdDev.get(0, 0)[0]+ 0.7152 * stdDev.get(1, 0)[0]+ 0.2126* stdDev.get(2, 0)[0];
-    }
-
-    public static Key bruteForceCrack(Mat image){
-        int N = largestPowerOf2(image.rows());
-        int width = image.cols();
-        byte[] imageData = new byte[N * width];
-        Mat bwImage = new Mat();
-        Imgproc.cvtColor(image, bwImage, Imgproc.COLOR_BGR2GRAY);
-        bwImage.get(0, 0, imageData);
-
-        Key bestKey = new Key(0,0);
-        double bestScore = Double.NEGATIVE_INFINITY;
-        double score;
-        int[] destIndexInBlockArr = new int[N];
-        int mask = N -1;
-        int pearsonStep =   Math.max(1, width / 50);
-
-        for(int s = 0; s < 128; s++){
-            int steps = 2*s +1;
-            for(int i = 0; i < N; i++){
-                destIndexInBlockArr[i] = (bestKey.r + steps * i) & mask;
-            }
-            score = 0.0;
-            for(int i = 0; i < mask; i++){
-                score += euclideanDistanceFast(imageData, destIndexInBlockArr[i], destIndexInBlockArr[i+1], width, pearsonStep);
-            }
-            if(score > bestScore){
-                bestScore = score;
-                bestKey.s = s;
-            }
-        }
-        bestScore = Double.NEGATIVE_INFINITY;
-        int steps = 2*bestKey.s +1;
-        for(int r = 0; r < 256; r++){
-            for(int i = 0; i < N; i++){
-                destIndexInBlockArr[i] = (r + steps * i) & mask;
-            }
-            score = 0.0;
-            for(int i = 0; i < mask; i++){
-                score += euclideanDistanceFast(imageData, destIndexInBlockArr[i], destIndexInBlockArr[i+1], width, pearsonStep);
-            }
-            if(score > bestScore){
-                bestScore = score;
-                bestKey.r = r;
-            }
-        }
-        return bestKey;
-    }
-
-
-    public static int findSmartS(Mat input) {
-        if (input == null || input.empty()) return 0;
-
-        int height = input.rows();
-        int width = input.cols();
-
-        int blockSize = largestPowerOf2(height);
-        int blockMask = blockSize - 1;
-
-        int midCol = width / 2;
-        byte[] columnData = new byte[blockSize];
-
-        for (int i = 0; i < blockSize; i++) {
-            double[] pixel = input.get(i, midCol);
-            columnData[i] = (byte) pixel[0];
-        }
-
-        double minDifference = Double.MAX_VALUE;
-        int bestS = 0;
-
-        for (int s = 0; s < 128; s++) {
-            int step = 2 * s + 1;
-            long currentDiff = 0;
-
-            for (int i = 0; i < blockSize; i++) {
-                int nextIndex = (i + step) & blockMask;
-
-                int val1 = columnData[i] & 0xFF;
-                int val2 = columnData[nextIndex] & 0xFF;
-
-                currentDiff += Math.abs(val1 - val2);
-            }
-
-            if (currentDiff < minDifference) {
-                minDifference = currentDiff;
-                bestS = s;
-            }
-        }
-
-        return bestS;
-    }
-
-    public static int findSmartR(Mat input, int s) {
-        if (input == null || input.empty()) return 0;
-
-        int height = input.rows();
-        int width = input.cols();
-
-        int size1 = largestPowerOf2(height);
-
-        if (size1 == height) return 0;
-
-        int size2 = largestPowerOf2(height - size1);
-
-        int step = 2 * s + 1;
-
-        int mask1 = size1 - 1;
-        int mask2 = size2 - 1;
-
-        int colStep = Math.max(1, width / 20);
-
-        double minDiff = Double.MAX_VALUE;
-        int bestR = 0;
-
-        for (int r = 0; r < 256; r++) {
-            long currentDiff = 0;
-
-            int srcRowInBlock1 = (r + step * (size1 - 1)) & mask1;
-            int absoluteSrcRow1 = srcRowInBlock1;
-
-            int srcRowInBlock2 = (r + step * 0) & mask2;
-            int absoluteSrcRow2 = size1 + srcRowInBlock2;
-
-            for (int col = 0; col < width; col += colStep) {
-                double[] p1 = input.get(absoluteSrcRow1, col);
-                double[] p2 = input.get(absoluteSrcRow2, col);
-
-                double val1 = p1[0];
-                double val2 = p2[0];
-
-                currentDiff += Math.abs(val1 - val2);
-            }
-
-            if (currentDiff < minDiff) {
-                minDiff = currentDiff;
-                bestR = r;
-            }
-        }
-
-        return bestR;
-    }
-
-    public static Key findSmartKey(Mat input) {
-        int s = findSmartS(input);
-        int r = findSmartR(input, s);
-        return new Key(r, s);
-    }
-
-
-    public static ArrayList<Point> getPositionsForDynamicEncryption(int height, int width, int k) {
-        SplittableRandom random = new SplittableRandom(k);
-        ArrayList<Point> positions = new ArrayList<>();
-
-        int x = random.nextInt(width);
-        int y = random.nextInt(height);
-
-        while (positions.size() < 15) {
-            while (positions.contains(new Point(x, y))) {
-                x = random.nextInt(width);
-                y = random.nextInt(height);
-            }
-            positions.add(new Point(x, y));
-        }
-
-        return positions;
-    }
-
     public static Mat dynamicEncrypt(Mat input, int k) {
         int height = input.rows();
         int width = input.cols();
@@ -459,4 +218,230 @@ public class Encryption {
 
         return decrypted;
     }
+
+    public static double pearson(byte[] x, byte[] y) {
+        int n = x.length;
+
+        double sumX = 0, sumY = 0;
+        double sumX2 = 0, sumY2 = 0;
+        double sumXY = 0;
+
+        for (int i = 0; i < n; i++) {
+            int xi = x[i] & 0xFF;
+            int yi = y[i] & 0xFF;
+
+            sumX += xi;
+            sumY += yi;
+            sumX2 += xi * xi;
+            sumY2 += yi * yi;
+            sumXY += xi * yi;
+        }
+
+        double numerator = n * sumXY - sumX * sumY;
+        double denominator = (n * sumX2 - sumX * sumX) * (n * sumY2 - sumY * sumY);
+
+        if (denominator == 0) return 0;
+        return numerator / denominator;
+    }
+
+    public static double pearsonFast(byte[] data, int r1, int r2, int length, int step) {
+        double sumX = 0, sumY = 0;
+        double sumX2 = 0, sumY2 = 0;
+        double sumXY = 0;
+
+        int xi, yi;
+
+        for (int i = 0; i < length; i+=step) {
+            xi = data[r1 * length + i] & 0xFF;
+            yi = data[r2 * length + i] & 0xFF;
+
+            sumX += xi;
+            sumY += yi;
+            sumX2 += xi * xi;
+            sumY2 += yi * yi;
+            sumXY += xi * yi;
+        }
+
+        double numerator = length * sumXY - sumX * sumY;
+        double denominator = (length * sumX2 - sumX * sumX) * (length * sumY2 - sumY * sumY);
+
+        if (denominator == 0) return 0;
+        return numerator / denominator;
+    }
+
+    public static double euclideanDistance(byte[] row1, byte[] row2) {
+        long sumSq = 0;
+
+        for (int i = 0; i < row1.length; i++) {
+            int p1 = row1[i] & 0xFF;
+            int p2 = row2[i] & 0xFF;
+
+            int diff = p1 - p2;
+
+            sumSq += diff * diff;
+        }
+
+        return -sumSq;
+    }
+
+    public static double euclideanDistanceFast(byte[] data, int r1, int r2, int length, int step) {
+        long sumSq = 0;
+        int p1, p2, diff;
+
+        for (int i = 0; i < length; i+=step) {
+            p1 = data[r1 * length + i] & 0xFF;
+            p2 = data[r2 * length + i] & 0xFF;
+
+            diff = p1 - p2;
+
+            sumSq += diff * diff;
+        }
+
+        return -sumSq;
+    }
+
+    public static double evaluateFrameForKeyFinding(Mat frame) {
+        MatOfDouble mean = new MatOfDouble();
+        MatOfDouble stdDev = new MatOfDouble();
+        Core.meanStdDev(frame, mean, stdDev);
+        return 0.0722 * stdDev.get(0, 0)[0]+ 0.7152  * stdDev.get(1, 0)[0]+ 0.2126* stdDev.get(2, 0)[0];
+    }
+
+    public static Key bruteForceCrack(Mat image){
+        int N = largestPowerOf2(image.rows());
+        int width = image.cols();
+        byte[] imageData = new byte[N * width];
+        Mat bwImage = new Mat();
+        Imgproc.cvtColor(image, bwImage, Imgproc.COLOR_BGR2GRAY);
+        bwImage.get(0, 0, imageData);
+
+        Key bestKey = new Key(0,0);
+        double bestScore = Double.NEGATIVE_INFINITY;
+        double score;
+        int[] destIndexInBlockArr = new int[N];
+        int mask = N -1;
+        int pearsonStep =   1;
+
+        for(int s = 0; s < 128; s++){
+            int steps = 2*s +1;
+            for(int i = 0; i < N; i++){
+                destIndexInBlockArr[i] = (bestKey.r + steps * i) & mask;
+            }
+            score = 0.0;
+            for(int i = 0; i < mask; i++){
+                score += euclideanDistanceFast(imageData, destIndexInBlockArr[i], destIndexInBlockArr[i+1], width, pearsonStep);
+            }
+            if(score > bestScore){
+                bestScore = score;
+                bestKey.s = s;
+            }
+        }
+        bestScore = Double.NEGATIVE_INFINITY;
+        int steps = 2*bestKey.s +1;
+        for(int r = 0; r < 256; r++){
+            for(int i = 0; i < N; i++){
+                destIndexInBlockArr[i] = (r + steps * i) & mask;
+            }
+            score = 0.0;
+            for(int i = 0; i < mask; i++){
+                score += euclideanDistanceFast(imageData, destIndexInBlockArr[i], destIndexInBlockArr[i+1], width, pearsonStep);
+            }
+            if(score > bestScore){
+                bestScore = score;
+                bestKey.r = r;
+            }
+        }
+        return bestKey;
+    }
+
+    public static Key smartCrack(Mat encryptedImage) {
+        int height = encryptedImage.rows();
+        int width = encryptedImage.cols();
+        int channels = encryptedImage.channels();
+        int rowSize = width * channels;
+
+        int blockSize = Integer.highestOneBit(height);
+        int blockMask = blockSize - 1;
+
+        // S
+        int bestPivotIndex = 0;
+        long maxVariance = -1;
+        byte[] tempRowData = new byte[rowSize];
+        int searchLimit = Math.min(height, blockSize);
+
+        for (int i = 0; i < searchLimit; i += 40) {
+            encryptedImage.get(i, 0, tempRowData);
+            long variance = calculateRowVariance(tempRowData, channels);
+
+            if (variance > maxVariance) {
+                maxVariance = variance;
+                bestPivotIndex = i;
+            }
+        }
+
+        byte[] pivotRowData = new byte[rowSize];
+        encryptedImage.get(bestPivotIndex, 0, pivotRowData);
+
+        byte[] candidateRowData = new byte[rowSize];
+        long minDistanceSq = Long.MAX_VALUE;
+        int bestS = 0;
+
+        for (int s = 0; s < 128; s++) {
+            int step = 2 * s + 1;
+            int neighborIndex = (bestPivotIndex + step) & blockMask;
+
+            encryptedImage.get(neighborIndex, 0, candidateRowData);
+            long currentDistanceSq = calculateEuclideanDistanceSq(pivotRowData, candidateRowData);
+
+            if (currentDistanceSq < minDistanceSq) {
+                minDistanceSq = currentDistanceSq;
+                bestS = s;
+            }
+        }
+
+        int step = 2 * bestS + 1;
+        int topIndex, bottomIndex;
+        double minCorrelation = Double.MAX_VALUE;
+        int bestR = 0;
+        Mat firstBlock = encryptedImage.submat(0, blockSize, 0, width);
+        Mat grayBlock = new Mat();
+        Imgproc.cvtColor(firstBlock, grayBlock, Imgproc.COLOR_BGR2GRAY);
+        byte[] data = new byte[width*blockSize];
+        grayBlock.get(0, 0, data);
+
+        for (int r = 0; r < 256; r++) {
+            topIndex = r;
+            bottomIndex  = (r - step) & blockMask;
+            double correlation = Encryption.euclideanDistanceFast(data, bottomIndex, topIndex, width, 1);
+
+            if (correlation < minCorrelation) {
+                minCorrelation = correlation;
+                bestR = r;
+            }
+        }
+
+        return new Key(bestR, bestS);
+    }
+
+    private static long calculateRowVariance(byte[] rowData, int channels) {
+        long totalVariance = 0;
+        for (int i = 0; i < rowData.length - channels; i++) {
+            int pixelValue1 = rowData[i] & 0xFF;
+            int pixelValue2 = rowData[i + channels] & 0xFF;
+            totalVariance += Math.abs(pixelValue1 - pixelValue2);
+        }
+        return totalVariance;
+    }
+
+    private static long calculateEuclideanDistanceSq(byte[] row1, byte[] row2) {
+        long sumSq = 0;
+        for (int i = 0; i < row1.length; i+=10) {
+            int val1 = row1[i] & 0xFF;
+            int val2 = row2[i] & 0xFF;
+            int diff = val1 - val2;
+            sumSq += diff * diff;
+        }
+        return sumSq;
+    }
+
 }

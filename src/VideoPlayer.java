@@ -120,7 +120,7 @@ public class VideoPlayer extends Application {
                 openButton4, playButton4, prevButton4, nextButton4, exportButton4, null,
                 frame -> {
                     if (autoCheckBox4.isSelected()) {
-                        Key k = Encryption.bruteForceCrack(frame);
+                        Key k = Encryption.smartCrack(frame);
                         return Encryption.decrypt(frame, k.r, k.s);
                     } else {
                         int k = parse(kField4, 0);
