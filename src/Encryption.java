@@ -6,9 +6,20 @@ import org.opencv.imgproc.Imgproc;
 import javax.swing.text.Position;
 import java.util.*;
 
-
+/**
+ * Classe fournissant des méthodes de chiffrement et déchiffrement d'images
+ * utilisant des permutations de lignes et de la stéganographie LSB.
+ */
 public class Encryption {
 
+    /**
+     * Génère une liste de positions aléatoires pour le chiffrement dynamique.
+     *
+     * @param height la hauteur de l'image
+     * @param width la largeur de l'image
+     * @param k la graine pour le générateur de nombres aléatoires
+     * @return une liste de 15 positions aléatoires uniques
+     */
     public static ArrayList<Point> getPositionsForDynamicEncryption(int height, int width, int k) {
         SplittableRandom random = new SplittableRandom(k);
         ArrayList<Point> positions = new ArrayList<>();
@@ -27,6 +38,12 @@ public class Encryption {
         return positions;
     }
 
+    /**
+     * Calcule la plus grande puissance de 2 inférieure ou égale à n.
+     *
+     * @param n le nombre entier
+     * @return la plus grande puissance de 2 <= n, ou 0 si n <= 0
+     */
     public static int largestPowerOf2(int n) {
         if (n <= 0) return 0;
         if (n == 1) return 1;
@@ -37,6 +54,14 @@ public class Encryption {
         return power;
     }
 
+    /**
+     * Chiffre une image en permutant les lignes selon les paramètres r et s.
+     *
+     * @param input l'image d'entrée à chiffrer
+     * @param r le paramètre r de la clé de chiffrement (0-255)
+     * @param s le paramètre s de la clé de chiffrement (0-127)
+     * @return l'image chiffrée
+     */
     public static Mat encrypt(Mat input, int r, int s) {
         int height = input.rows();
         int width = input.cols();
@@ -79,6 +104,14 @@ public class Encryption {
         return output;
     }
 
+    /**
+     * Déchiffre une image en inversant la permutation des lignes.
+     *
+     * @param input l'image chiffrée
+     * @param r le paramètre r de la clé de déchiffrement (0-255)
+     * @param s le paramètre s de la clé de déchiffrement (0-127)
+     * @return l'image déchiffrée
+     */
     public static Mat decrypt(Mat input, int r, int s) {
         int height = input.rows();
         int width = input.cols();
@@ -121,6 +154,13 @@ public class Encryption {
         return output;
     }
 
+    /**
+     * Chiffre dynamiquement une image en cachant la clé dans les pixels via stéganographie LSB.
+     *
+     * @param input l'image d'entrée
+     * @param k la graine pour générer les positions de cachage de la clé
+     * @return l'image chiffrée avec la clé cachée
+     */
     public static Mat dynamicEncrypt(Mat input, int k) {
         int height = input.rows();
         int width = input.cols();
@@ -172,6 +212,13 @@ public class Encryption {
         return encrypted;
     }
 
+    /**
+     * Déchiffre une image dynamiquement en extrayant la clé cachée des pixels.
+     *
+     * @param input l'image chiffrée avec clé cachée
+     * @param k la graine pour localiser les positions de la clé cachée
+     * @return l'image déchiffrée
+     */
     public static Mat dynamicDecrypt(Mat input, int k) {
         int height = input.rows();
         int width = input.cols();
@@ -211,6 +258,13 @@ public class Encryption {
         return decrypted;
     }
 
+    /**
+     * Calcule le coefficient de corrélation de Pearson entre deux tableaux d'octets.
+     *
+     * @param x le premier tableau
+     * @param y le second tableau
+     * @return le coefficient de corrélation de Pearson
+     */
     public static double pearson(byte[] x, byte[] y) {
         int n = x.length;
 
@@ -236,6 +290,16 @@ public class Encryption {
         return numerator / denominator;
     }
 
+    /**
+     * Calcule rapidement le coefficient de Pearson entre deux lignes avec échantillonnage.
+     *
+     * @param data le tableau de données contenant toutes les lignes
+     * @param r1 l'indice de la première ligne
+     * @param r2 l'indice de la seconde ligne
+     * @param length la longueur d'une ligne
+     * @param step le pas d'échantillonnage
+     * @return le coefficient de corrélation de Pearson
+     */
     public static double pearsonFast(byte[] data, int r1, int r2, int length, int step) {
         double sumX = 0, sumY = 0;
         double sumX2 = 0, sumY2 = 0;
@@ -261,6 +325,13 @@ public class Encryption {
         return numerator / denominator;
     }
 
+    /**
+     * Calcule la distance euclidienne négative entre deux lignes.
+     *
+     * @param row1 la première ligne
+     * @param row2 la seconde ligne
+     * @return la distance euclidienne négative (pour minimisation)
+     */
     public static double euclideanDistance(byte[] row1, byte[] row2) {
         long sumSq = 0;
 
@@ -276,6 +347,16 @@ public class Encryption {
         return -sumSq;
     }
 
+    /**
+     * Calcule rapidement la distance euclidienne négative avec échantillonnage.
+     *
+     * @param data le tableau de données contenant toutes les lignes
+     * @param r1 l'indice de la première ligne
+     * @param r2 l'indice de la seconde ligne
+     * @param length la longueur d'une ligne
+     * @param step le pas d'échantillonnage
+     * @return la distance euclidienne négative
+     */
     public static double euclideanDistanceFast(byte[] data, int r1, int r2, int length, int step) {
         long sumSq = 0;
         int p1, p2, diff;
@@ -292,6 +373,12 @@ public class Encryption {
         return -sumSq;
     }
 
+    /**
+     * Évalue la qualité d'une image pour la recherche de clé en calculant l'écart-type pondéré.
+     *
+     * @param frame l'image à évaluer
+     * @return le score d'évaluation basé sur l'écart-type
+     */
     public static double evaluateFrameForKeyFinding(Mat frame) {
         MatOfDouble mean = new MatOfDouble();
         MatOfDouble stdDev = new MatOfDouble();
@@ -299,6 +386,12 @@ public class Encryption {
         return 0.0722 * stdDev.get(0, 0)[0]+ 0.7152  * stdDev.get(1, 0)[0]+ 0.2126* stdDev.get(2, 0)[0];
     }
 
+    /**
+     * Craque la clé de chiffrement par force brute en testant toutes les combinaisons.
+     *
+     * @param image l'image chiffrée
+     * @return la clé trouvée (r, s)
+     */
     public static Key bruteForceCrack(Mat image){
         int N = largestPowerOf2(image.rows());
         int width = image.cols();
@@ -346,6 +439,12 @@ public class Encryption {
         return bestKey;
     }
 
+    /**
+     * Craque intelligemment la clé en analysant les corrélations entre lignes voisines.
+     *
+     * @param encryptedImage l'image chiffrée
+     * @return la clé trouvée (r, s)
+     */
     public static Key smartCrack(Mat encryptedImage) {
         int height = encryptedImage.rows();
         int width = encryptedImage.cols();
@@ -415,6 +514,13 @@ public class Encryption {
         return new Key(bestR, bestS);
     }
 
+    /**
+     * Calcule la variance d'une ligne en mesurant les différences entre pixels adjacents.
+     *
+     * @param rowData les données de la ligne
+     * @param channels le nombre de canaux de couleur
+     * @return la variance totale de la ligne
+     */
     private static long calculateRowVariance(byte[] rowData, int channels) {
         long totalVariance = 0;
         for (int i = 0; i < rowData.length - channels; i++) {
@@ -425,6 +531,13 @@ public class Encryption {
         return totalVariance;
     }
 
+    /**
+     * Calcule la distance euclidienne au carré entre deux lignes avec échantillonnage.
+     *
+     * @param row1 la première ligne
+     * @param row2 la seconde ligne
+     * @return la distance euclidienne au carré
+     */
     private static long calculateEuclideanDistanceSq(byte[] row1, byte[] row2) {
         long sumSq = 0;
         for (int i = 0; i < row1.length; i+=10) {

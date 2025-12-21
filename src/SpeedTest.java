@@ -10,7 +10,7 @@ public class SpeedTest {
         String imagePath = "image.jpg";
         int iterations_crypt = 1000;
         int iterations_decrypt = 1000;
-        int iterations_key_finding = 1000;
+        int iterations_key_finding = 100;
         int iterations_smart_key_finding = 1000;
 
         Mat image = Imgcodecs.imread(imagePath);

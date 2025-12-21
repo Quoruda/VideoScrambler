@@ -23,6 +23,11 @@ import java.util.List;
 import java.util.Random;
 import java.util.function.Function;
 
+/**
+ * Application JavaFX permettant de chiffrer et déchiffrer des vidéos en temps réel.
+ * Supporte plusieurs modes : chiffrement/déchiffrement statique (r, s) et dynamique (k).
+ * Permet la lecture, la navigation frame par frame et l'export de vidéos traitées.
+ */
 public class VideoPlayer extends Application {
 
     static { System.loadLibrary(Core.NATIVE_LIBRARY_NAME); }
@@ -66,6 +71,12 @@ public class VideoPlayer extends Application {
     private double fps = 30.0;
     private long lastFrameTime = 0;
 
+    /**
+     * Démarre l'application JavaFX et charge l'interface FXML.
+     *
+     * @param primaryStage la fenêtre principale de l'application
+     * @throws Exception si le chargement du fichier FXML échoue
+     */
     @Override
     public void start(Stage primaryStage) throws Exception {
         FXMLLoader loader = new FXMLLoader(getClass().getResource("VideoPlayer.fxml"));
@@ -80,6 +91,10 @@ public class VideoPlayer extends Application {
         primaryStage.show();
     }
 
+    /**
+     * Initialise les composants de l'interface et configure les 4 onglets de traitement.
+     * Configure également les listeners pour les changements d'onglet et l'état initial de l'UI.
+     */
     @FXML
     public void initialize() {
         // Configuration Onglet 0 : Chiffrement (r, s)
@@ -138,12 +153,21 @@ public class VideoPlayer extends Application {
 
     // --- GESTION DE L'INTERFACE ---
 
+    /**
+     * Récupère le contexte de l'onglet actuellement sélectionné.
+     *
+     * @return le TabContext de l'onglet actif
+     */
     private TabContext getCurrentTab() {
         int index = modeTabPane.getSelectionModel().getSelectedIndex();
         if (index >= 0 && index < tabs.size()) return tabs.get(index);
         return tabs.get(0);
     }
 
+    /**
+     * Met à jour l'interface utilisateur en fonction de l'onglet actif.
+     * Change les labels et rafraîchit l'affichage.
+     */
     private void updateUIForActiveTab() {
         TabContext current = getCurrentTab();
         inputLabel.setText(current.inputLabel);
@@ -151,18 +175,29 @@ public class VideoPlayer extends Application {
         refreshDisplay();
     }
 
+    /**
+     * Rafraîchit l'affichage de la frame courante avec le traitement de l'onglet actif.
+     */
     private void refreshDisplay() {
         if (videoCapture != null && videoCapture.isOpened()) {
             showFrame(currentFrameIndex);
         }
     }
 
+    /**
+     * Active ou désactive tous les contrôles de tous les onglets.
+     *
+     * @param disabled true pour désactiver, false pour activer
+     */
     private void setAllControlsDisabled(boolean disabled) {
         tabs.forEach(tab -> tab.setControlsDisabled(disabled));
     }
 
     // --- ACTIONS FXML ---
 
+    /**
+     * Gestionnaire pour l'ouverture d'une vidéo via FileChooser.
+     */
     @FXML private void handleOpenVideo() {
         FileChooser fc = new FileChooser();
         fc.getExtensionFilters().add(new FileChooser.ExtensionFilter("Vidéos", "*.mp4", "*.avi", "*.mkv"));
@@ -173,14 +208,28 @@ public class VideoPlayer extends Application {
         }
     }
 
+    /**
+     * Gestionnaire pour basculer entre lecture et pause de la vidéo.
+     */
     @FXML private void handlePlayPause() {
         if (isPlaying) pauseVideo();
         else playVideo();
     }
 
+    /**
+     * Gestionnaire pour naviguer vers la frame précédente.
+     */
     @FXML private void handlePrevFrame() { navigateFrame(-1); }
+
+    /**
+     * Gestionnaire pour naviguer vers la frame suivante.
+     */
     @FXML private void handleNextFrame() { navigateFrame(1); }
 
+    /**
+     * Gestionnaire pour la checkbox de détection automatique de clé (onglet 4).
+     * Active/désactive le champ de saisie de clé et rafraîchit l'affichage.
+     */
     @FXML private void handleAutoCheckBox() {
         boolean isAuto = autoCheckBox4.isSelected();
         kField4.setDisable(isAuto);
@@ -189,6 +238,12 @@ public class VideoPlayer extends Application {
 
     // --- GESTION VIDÉO ---
 
+    /**
+     * Charge une vidéo depuis le chemin spécifié.
+     * Initialise les propriétés de la vidéo (nombre de frames, FPS) et affiche la première frame.
+     *
+     * @param path le chemin du fichier vidéo à charger
+     */
     private void loadVideo(String path) {
         if (videoCapture != null) videoCapture.release();
         currentVideoPath = path;
@@ -203,6 +258,11 @@ public class VideoPlayer extends Application {
         }
     }
 
+    /**
+     * Navigue vers une frame relative à la position actuelle.
+     *
+     * @param delta le déplacement relatif (négatif pour reculer, positif pour avancer)
+     */
     private void navigateFrame(int delta) {
         int newIndex = currentFrameIndex + delta;
         if (newIndex >= 0 && newIndex < totalFrames) {
@@ -211,6 +271,10 @@ public class VideoPlayer extends Application {
         }
     }
 
+    /**
+     * Lance la lecture de la vidéo avec le traitement de l'onglet actif.
+     * Utilise un AnimationTimer pour synchroniser l'affichage avec le FPS de la vidéo.
+     */
     private void playVideo() {
         if (videoCapture == null || !videoCapture.isOpened()) return;
 
@@ -242,12 +306,20 @@ public class VideoPlayer extends Application {
         playTimer.start();
     }
 
+    /**
+     * Met en pause la lecture de la vidéo et arrête le timer d'animation.
+     */
     private void pauseVideo() {
         isPlaying = false;
         getCurrentTab().playButton.setText("▶ Lecture");
         if (playTimer != null) playTimer.stop();
     }
 
+    /**
+     * Affiche une frame spécifique de la vidéo avec traitement.
+     *
+     * @param index l'indice de la frame à afficher
+     */
     private void showFrame(int index) {
         if (videoCapture == null || !videoCapture.isOpened()) return;
         videoCapture.set(Videoio.CAP_PROP_POS_FRAMES, index);
@@ -257,6 +329,11 @@ public class VideoPlayer extends Application {
         }
     }
 
+    /**
+     * Traite une frame brute avec le processeur de l'onglet actif et met à jour l'affichage.
+     *
+     * @param rawFrame la frame brute à traiter
+     */
     private void processAndDisplay(Mat rawFrame) {
         try {
             Mat processed = getCurrentTab().processor.apply(rawFrame);
@@ -269,6 +346,12 @@ public class VideoPlayer extends Application {
 
     // --- ACTIONS AUTOMATIQUE & EXPORT ---
 
+    /**
+     * Gestionnaire pour la recherche automatique de clé de chiffrement.
+     * Pour l'onglet 0 (chiffrement) : génère une clé aléatoire.
+     * Pour l'onglet 1 (déchiffrement) : analyse plusieurs frames et utilise brute force.
+     * Exécute le traitement dans un thread séparé pour ne pas bloquer l'UI.
+     */
     @FXML
     private void handleAutoKey() {
         if (videoCapture == null) return;
@@ -313,6 +396,11 @@ public class VideoPlayer extends Application {
 
     }
 
+    /**
+     * Gestionnaire pour l'export de la vidéo traitée.
+     * Demande un chemin de destination, puis traite toutes les frames en arrière-plan.
+     * Affiche une barre de progression pendant l'export.
+     */
     @FXML
     private void handleExportVideo() {
         if (videoCapture == null) return;
@@ -364,6 +452,15 @@ public class VideoPlayer extends Application {
         }).start();
     }
 
+    /**
+     * Boucle d'export qui traite chaque frame de la vidéo et l'écrit dans le fichier de sortie.
+     * Utilise le codec HuffYUV (HFYU) pour un export lossless rapide.
+     *
+     * @param outPath le chemin du fichier de sortie
+     * @param processor la fonction de traitement à appliquer à chaque frame
+     * @param bar la barre de progression à mettre à jour
+     * @return true si l'export a réussi, false sinon
+     */
     private boolean exportLoop(String outPath, Function<Mat, Mat> processor, ProgressBar bar) {
         VideoCapture cap = new VideoCapture(currentVideoPath);
         if (!cap.isOpened()) {
@@ -414,11 +511,23 @@ public class VideoPlayer extends Application {
 
     // --- UTILITAIRES ---
 
+    /**
+     * Parse le texte d'un TextField en entier.
+     *
+     * @param field le champ texte à parser
+     * @param def la valeur par défaut en cas d'erreur de parsing
+     * @return la valeur parsée ou la valeur par défaut
+     */
     private int parse(TextField field, int def) {
         try { return Integer.parseInt(field.getText()); }
         catch (Exception e) { return def; }
     }
 
+    /**
+     * Affiche un FileChooser pour sélectionner le fichier de destination de l'export.
+     *
+     * @return le fichier sélectionné ou null si annulé
+     */
     private File promptForSave() {
         FileChooser fc = new FileChooser();
         // HFYU fonctionne bien avec .avi ou .mkv
@@ -428,12 +537,24 @@ public class VideoPlayer extends Application {
         return fc.showSaveDialog(stage);
     }
 
+    /**
+     * Affiche une boîte de dialogue d'information.
+     *
+     * @param title le titre de la fenêtre
+     * @param content le message à afficher
+     */
     private void showAlert(String title, String content) {
         Alert a = new Alert(Alert.AlertType.INFORMATION);
         a.setTitle(title); a.setHeaderText(null); a.setContentText(content);
         a.showAndWait();
     }
 
+    /**
+     * Crée une fenêtre de dialogue avec une barre de progression pour l'export.
+     *
+     * @param bar la barre de progression à afficher
+     * @return l'Alert configurée
+     */
     private Alert createProgressDialog(ProgressBar bar) {
         bar.setPrefWidth(300);
         // Changement AlertType.NONE -> INFORMATION pour avoir un comportement standard de fenêtre
@@ -446,6 +567,13 @@ public class VideoPlayer extends Application {
         return a;
     }
 
+    /**
+     * Convertit une Mat OpenCV en Image JavaFX pour l'affichage.
+     * Gère les images en niveaux de gris et en couleur (BGR).
+     *
+     * @param mat la matrice OpenCV à convertir
+     * @return l'Image JavaFX correspondante
+     */
     private Image matToImage(Mat mat) {
         int w = mat.cols(), h = mat.rows(), c = mat.channels();
         WritableImage img = new WritableImage(w, h);
@@ -469,12 +597,29 @@ public class VideoPlayer extends Application {
 
     // --- CLASSE INTERNE CONTEXTE ---
 
+    /**
+     * Classe interne représentant le contexte d'un onglet de traitement.
+     * Encapsule les labels, boutons, champs de saisie et la fonction de traitement.
+     */
     private class TabContext {
         String inputLabel, outputLabel;
         Button openButton, playButton, prevButton, nextButton, exportButton, autoButton;
         Function<Mat, Mat> processor;
         List<TextField> inputs = new ArrayList<>();
 
+        /**
+         * Construit un contexte d'onglet avec ses composants et son processeur.
+         *
+         * @param inLbl le label pour la vidéo d'entrée
+         * @param outLbl le label pour la vidéo de sortie
+         * @param open le bouton d'ouverture
+         * @param play le bouton lecture/pause
+         * @param prev le bouton frame précédente
+         * @param next le bouton frame suivante
+         * @param export le bouton d'export
+         * @param auto le bouton de détection automatique (peut être null)
+         * @param proc la fonction de traitement à appliquer aux frames
+         */
         public TabContext(String inLbl, String outLbl,
                           Button open, Button play, Button prev, Button next, Button export, Button auto,
                           Function<Mat, Mat> proc) {
@@ -485,6 +630,12 @@ public class VideoPlayer extends Application {
             this.processor = proc;
         }
 
+        /**
+         * Ajoute des champs de saisie au contexte et configure des listeners pour rafraîchir l'affichage.
+         *
+         * @param fields les champs de saisie à ajouter
+         * @return ce TabContext pour chaînage
+         */
         public TabContext addInputs(TextField... fields) {
             for (TextField f : fields) {
                 this.inputs.add(f);
@@ -493,6 +644,11 @@ public class VideoPlayer extends Application {
             return this;
         }
 
+        /**
+         * Active ou désactive tous les contrôles de cet onglet.
+         *
+         * @param disabled true pour désactiver, false pour activer
+         */
         public void setControlsDisabled(boolean disabled) {
             if (openButton != null) openButton.setDisable(disabled);
             if (playButton != null) playButton.setDisable(disabled);
@@ -503,5 +659,10 @@ public class VideoPlayer extends Application {
         }
     }
 
+    /**
+     * Point d'entrée principal de l'application.
+     *
+     * @param args arguments de la ligne de commande
+     */
     public static void main(String[] args) { launch(args); }
 }
