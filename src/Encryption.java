@@ -3,7 +3,6 @@ import org.opencv.core.Mat;
 import org.opencv.core.MatOfDouble;
 import org.opencv.core.Point;
 import org.opencv.imgproc.Imgproc;
-
 import javax.swing.text.Position;
 import java.util.*;
 
@@ -31,7 +30,6 @@ public class Encryption {
     public static int largestPowerOf2(int n) {
         if (n <= 0) return 0;
         if (n == 1) return 1;
-
         int power = 1;
         while (power * 2 <= n) {
             power *= 2;
@@ -40,9 +38,6 @@ public class Encryption {
     }
 
     public static Mat encrypt(Mat input, int r, int s) {
-        if (input == null || input.empty()) return input;
-        if (r == 0 && s == 0) return input.clone();
-
         int height = input.rows();
         int width = input.cols();
         int channels = input.channels();
@@ -85,9 +80,6 @@ public class Encryption {
     }
 
     public static Mat decrypt(Mat input, int r, int s) {
-        if (input == null || input.empty()) return input;
-        if (r == 0 && s == 0) return input.clone();
-
         int height = input.rows();
         int width = input.cols();
         int channels = input.channels();
