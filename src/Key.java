@@ -1,3 +1,5 @@
+// Auteurs : Audrick SOLTNER et Gaẽl RÖTHLIN
+
 /**
  * Représente une clé de chiffrement composée de deux paramètres r et s.
  * Cette classe est utilisée pour stocker et manipuler les clés de chiffrement
