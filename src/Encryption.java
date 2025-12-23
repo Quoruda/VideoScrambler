@@ -189,14 +189,13 @@ public class Encryption {
             int col = (int) p.x;
             boolean bitToHide = keyBits[i];
 
-            // Lire le pixel (dans un tableau de double ou byte selon l'implémentation OpenCV)
+            // Lire le pixel
             double[] pixel = encrypted.get(row, col);
 
-            // On ne modifie qu'un seul canal (le Bleu/Gris, souvent l'indice 0)
+            // On ne modifie qu'un seul canal
             int channelIndex = 0;
 
             // Extraire la valeur entière du canal (0-255)
-            // On prend le premier canal (Blue ou Grayscale)
             int channelValue = (int) pixel[channelIndex];
 
             // Mise à jour de l'LSB :
@@ -407,10 +406,11 @@ public class Encryption {
         double score;
         int[] destIndexInBlockArr = new int[N];
         int mask = N -1;
-        int pearsonStep =   1;
+        int pearsonStep = Math.max(1,  Math.floorDiv(width,480));
+        int steps;
 
         for(int s = 0; s < 128; s++){
-            int steps = 2*s +1;
+            steps = 2*s +1;
             for(int i = 0; i < N; i++){
                 destIndexInBlockArr[i] = (bestKey.r + steps * i) & mask;
             }
@@ -424,7 +424,7 @@ public class Encryption {
             }
         }
         bestScore = Double.NEGATIVE_INFINITY;
-        int steps = 2*bestKey.s +1;
+        steps = 2*bestKey.s +1;
         for(int r = 0; r < 256; r++){
             for(int i = 0; i < N; i++){
                 destIndexInBlockArr[i] = (r + steps * i) & mask;
@@ -456,6 +456,12 @@ public class Encryption {
         int blockSize = Integer.highestOneBit(height);
         int blockMask = blockSize - 1;
 
+        Mat firstBlock = encryptedImage.submat(0, blockSize, 0, width);
+        Mat grayBlock = new Mat();
+        Imgproc.cvtColor(firstBlock, grayBlock, Imgproc.COLOR_BGR2GRAY);
+        byte[] data = new byte[width*blockSize];
+        grayBlock.get(0, 0, data);
+
         // S
         int bestPivotIndex = 0;
         long maxVariance = -1;
@@ -472,21 +478,17 @@ public class Encryption {
             }
         }
 
-        byte[] pivotRowData = new byte[rowSize];
-        encryptedImage.get(bestPivotIndex, 0, pivotRowData);
 
-        byte[] candidateRowData = new byte[rowSize];
-        long minDistanceSq = Long.MAX_VALUE;
+        double minDistanceSq = Double.NEGATIVE_INFINITY;
         int bestS = 0;
 
         for (int s = 0; s < 128; s++) {
             int step = 2 * s + 1;
             int neighborIndex = (bestPivotIndex + step) & blockMask;
 
-            encryptedImage.get(neighborIndex, 0, candidateRowData);
-            long currentDistanceSq = calculateEuclideanDistanceSq(pivotRowData, candidateRowData);
+            double currentDistanceSq = euclideanDistanceFast(data, neighborIndex, bestPivotIndex, width, 1);
 
-            if (currentDistanceSq < minDistanceSq) {
+            if (currentDistanceSq > minDistanceSq) {
                 minDistanceSq = currentDistanceSq;
                 bestS = s;
             }
@@ -496,17 +498,14 @@ public class Encryption {
         int topIndex, bottomIndex;
         double minCorrelation = Double.MAX_VALUE;
         int bestR = 0;
-        Mat firstBlock = encryptedImage.submat(0, blockSize, 0, width);
-        Mat grayBlock = new Mat();
-        Imgproc.cvtColor(firstBlock, grayBlock, Imgproc.COLOR_BGR2GRAY);
-        byte[] data = new byte[width*blockSize];
-        grayBlock.get(0, 0, data);
+
 
         for (int r = 0; r < 256; r++) {
             topIndex = r;
             bottomIndex  = (r - step) & blockMask;
             double correlation = Encryption.euclideanDistanceFast(data, bottomIndex, topIndex, width, 1);
 
+            // Logique inversé, on cherche une rupture
             if (correlation < minCorrelation) {
                 minCorrelation = correlation;
                 bestR = r;
@@ -532,23 +531,4 @@ public class Encryption {
         }
         return totalVariance;
     }
-
-    /**
-     * Calcule la distance euclidienne au carré entre deux lignes avec échantillonnage.
-     *
-     * @param row1 la première ligne
-     * @param row2 la seconde ligne
-     * @return la distance euclidienne au carré
-     */
-    private static long calculateEuclideanDistanceSq(byte[] row1, byte[] row2) {
-        long sumSq = 0;
-        for (int i = 0; i < row1.length; i+=10) {
-            int val1 = row1[i] & 0xFF;
-            int val2 = row2[i] & 0xFF;
-            int diff = val1 - val2;
-            sumSq += diff * diff;
-        }
-        return sumSq;
-    }
-
 }
