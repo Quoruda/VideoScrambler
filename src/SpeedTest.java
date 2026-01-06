@@ -7,7 +7,7 @@ public class SpeedTest {
     public static void main(String[] args) {
         System.loadLibrary(Core.NATIVE_LIBRARY_NAME);
 
-        String imagePath = "image.jpg";
+        String imagePath = "inputs/fhd.jpg";
         int iterations_crypt = 1000;
         int iterations_decrypt = 1000;
         int iterations_key_finding = 100;

@@ -10,7 +10,7 @@ import java.util.*;
 
 /**
  * Classe fournissant des méthodes de chiffrement et déchiffrement d'images
- * utilisant des permutations de lignes et de la stéganographie LSB.
+ * utilisant des permutations de lignes.
  */
 public class Encryption {
 
@@ -358,19 +358,12 @@ public class Encryption {
      * @param step le pas d'échantillonnage
      * @return la distance euclidienne négative
      */
-    public static double euclideanDistanceFast(byte[] data, int r1, int r2, int length, int step) {
+    public static double euclideanDistanceFast(byte[] data, int r1, int r2, int length, double step) {
         long sumSq = 0;
-        int p1, p2, diff;
-
-        for (int i = 0; i < length; i+=step) {
-            p1 = data[r1 * length + i] & 0xFF;
-            p2 = data[r2 * length + i] & 0xFF;
-
-            diff = p1 - p2;
-
-            sumSq += diff * diff;
+        for (double di = 0; di < length; di+=step) {
+            int i = (int) di;
+            sumSq += Math.abs((data[r1 * length + i] & 0xFF) - (data[r2 * length + i] & 0xFF));
         }
-
         return -sumSq;
     }
 
@@ -406,7 +399,7 @@ public class Encryption {
         double score;
         int[] destIndexInBlockArr = new int[N];
         int mask = N -1;
-        int pearsonStep = Math.max(1,  Math.floorDiv(width,480));
+        double pearsonStep = Math.max( 1.0, (double) width/480.0);
         int steps;
 
         for(int s = 0; s < 128; s++){
@@ -450,8 +443,6 @@ public class Encryption {
     public static Key smartCrack(Mat encryptedImage) {
         int height = encryptedImage.rows();
         int width = encryptedImage.cols();
-        int channels = encryptedImage.channels();
-        int rowSize = width * channels;
 
         int blockSize = Integer.highestOneBit(height);
         int blockMask = blockSize - 1;
@@ -465,12 +456,13 @@ public class Encryption {
         // S
         int bestPivotIndex = 0;
         long maxVariance = -1;
-        byte[] tempRowData = new byte[rowSize];
-        int searchLimit = Math.min(height, blockSize);
 
-        for (int i = 0; i < searchLimit; i += 40) {
-            encryptedImage.get(i, 0, tempRowData);
-            long variance = calculateRowVariance(tempRowData, channels);
+        double heightStep = Math.max(1.0, (double) height/480);
+        long variance;
+
+        for (double di = 0; di < blockSize; di += heightStep) {
+            int i = (int) di;
+            variance = calculateRowVarianceMono(data, i , width);
 
             if (variance > maxVariance) {
                 maxVariance = variance;
@@ -480,13 +472,15 @@ public class Encryption {
 
 
         double minDistanceSq = Double.NEGATIVE_INFINITY;
+        double currentDistanceSq;
         int bestS = 0;
+        int step, neighborIndex;
 
         for (int s = 0; s < 128; s++) {
-            int step = 2 * s + 1;
-            int neighborIndex = (bestPivotIndex + step) & blockMask;
+            step = 2 * s + 1;
+            neighborIndex = (bestPivotIndex + step) & blockMask;
 
-            double currentDistanceSq = euclideanDistanceFast(data, neighborIndex, bestPivotIndex, width, 1);
+            currentDistanceSq = euclideanDistanceFast(data, neighborIndex, bestPivotIndex, width, 1);
 
             if (currentDistanceSq > minDistanceSq) {
                 minDistanceSq = currentDistanceSq;
@@ -494,16 +488,15 @@ public class Encryption {
             }
         }
 
-        int step = 2 * bestS + 1;
+        step = 2 * bestS + 1;
         int topIndex, bottomIndex;
         double minCorrelation = Double.MAX_VALUE;
+        double correlation;
         int bestR = 0;
-
-
         for (int r = 0; r < 256; r++) {
             topIndex = r;
             bottomIndex  = (r - step) & blockMask;
-            double correlation = Encryption.euclideanDistanceFast(data, bottomIndex, topIndex, width, 1);
+            correlation = Encryption.euclideanDistanceFast(data, bottomIndex, topIndex, width, 1);
 
             // Logique inversé, on cherche une rupture
             if (correlation < minCorrelation) {
@@ -518,16 +511,17 @@ public class Encryption {
     /**
      * Calcule la variance d'une ligne en mesurant les différences entre pixels adjacents.
      *
-     * @param rowData les données de la ligne
-     * @param channels le nombre de canaux de couleur
+     * @param rowData les données de l'image
+     * @param rowIndex index de la ligne
+     * @param width largeur de l'image
      * @return la variance totale de la ligne
      */
-    private static long calculateRowVariance(byte[] rowData, int channels) {
+    private static long calculateRowVarianceMono(byte[] rowData, int rowIndex, int width) {
         long totalVariance = 0;
-        for (int i = 0; i < rowData.length - channels; i++) {
-            int pixelValue1 = rowData[i] & 0xFF;
-            int pixelValue2 = rowData[i + channels] & 0xFF;
-            totalVariance += Math.abs(pixelValue1 - pixelValue2);
+        int start = rowIndex * width;
+        int end = start + width - 1;
+        for (int i = start; i < end; i++) {
+            totalVariance += Math.abs( (rowData[i] & 0xFF) - (rowData[i + 1] & 0xFF));
         }
         return totalVariance;
     }
